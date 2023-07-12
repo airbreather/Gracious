@@ -2,7 +2,7 @@
 
 internal sealed record UsernameTitleMappingConfiguration
 {
-    public string Username { get; init; } = string.Empty;
+    public required string Username { get; init; }
 
-    public string StreamTitle { get; init; } = string.Empty;
+    public required string StreamTitle { get; init; }
 }
