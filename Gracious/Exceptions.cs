@@ -10,19 +10,37 @@ You should have received a copy of the GNU Affero General Public License along w
 */
 namespace Gracious;
 
-internal static class StartOfStreamPacketData
+internal sealed class AlreadyPlayingMusicException : Exception
 {
-    public static void ReadFromBuffer(ReadOnlySpan<byte> buf, out long ticksPerSecond)
+}
+
+internal sealed class CouldNotCreateSessionFolderException : Exception
+{
+}
+
+internal sealed class BadConfigFileException : Exception
+{
+}
+
+internal sealed class ProcessExitedWithCodeException : Exception
+{
+    public ProcessExitedWithCodeException(int? exitCode)
+        : base($"Process exited with code {exitCode?.ToString() ?? "(unknown)"}")
     {
-        ticksPerSecond = buf.Read<long>();
+        ExitCode = exitCode;
     }
 
-    public static int WriteToBuffer(long ticksPerSecond, scoped Span<byte> buf)
-    {
-        Span<byte> remaining = buf;
+    public int? ExitCode { get; }
+}
 
-        remaining.Write(ticksPerSecond);
+internal sealed class SessionAlreadyStartedException : Exception
+{
+}
 
-        return buf.Length - remaining.Length;
-    }
+internal sealed class SessionDoesNotExistException : Exception
+{
+}
+
+internal sealed class SessionStartedBySomeoneElseException : Exception
+{
 }
