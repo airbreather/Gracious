@@ -1,6 +1,6 @@
 # Gracious
 
-Gracious (named after [Craig / Giarc](https://craig.chat)) is a multi-track voice channel recording bot for Discord that has some additional features that I wanted to add for my own purposes.
+Gracious (named after [Craig / Giarc](https://craig.chat) and my short-lived self-hosted clone of the same code, "Graci") is a multi-track voice channel recording bot for Discord that has some additional features that I wanted to add for my own purposes.
 
 The history of this bot:
 - I used to use a self-hosted Craig instance, alongside the public Craig and Giarc instances, to record a weekly event that lasts for approximately 3 hours.  I would also start recording my desktop at the same time using a self-host of Ennuicastr.
