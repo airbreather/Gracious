@@ -36,7 +36,7 @@ internal sealed class GraciousCommandModule : ApplicationCommandModule
     [SlashCommand("join", "Orders Gracious to join the listed voice channel.")]
     public async Task JoinCommand(
         InteractionContext ctx,
-        [Option("channel", "What *voice* channel to join, or leave it blank for me to join your current *voice* channel.")] DiscordChannel? channel = null)
+        [Option("channel", "What channel to join, or leave it blank for me to join your current one."), ChannelTypes(ChannelType.Voice)] DiscordChannel? channel = null)
     {
         try
         {
@@ -50,14 +50,6 @@ internal sealed class GraciousCommandModule : ApplicationCommandModule
         async ValueTask Core()
         {
             GraciousConfiguration cfg = _cfg.CurrentValue;
-
-            if (channel?.Type is not (null or ChannelType.Voice))
-            {
-                await ctx.CreateResponseAsync(InteractionResponseType.ChannelMessageWithSource, new DiscordInteractionResponseBuilder()
-                    .AddEmbed(new DiscordEmbedBuilder().WithImageUrl("https://c.tenor.com/h4UYMTilEAoAAAAC/sass-text.gif"))
-                    .WithContent("Please, if you are going to ask me to join a channel, then for the love of all that is holy, pick a *VOICE* channel.  I can't make Discord force the issue."));
-                return;
-            }
 
             if (ctx.Member is not DiscordMember member)
             {
