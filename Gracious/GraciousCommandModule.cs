@@ -80,7 +80,7 @@ internal sealed class GraciousCommandModule : ApplicationCommandModule
             try
             {
                 GraciousSession session = await _sessions.BeginAsync(ctx.User, channel);
-                await ctx.EditResponseAsync(new DiscordWebhookBuilder().WithContent($"Joined voice channel '{channel!.Name}'.  You will need this ID to retrieve your recording, remember it: `{session.SessionId}`\n\n{SourceOffer}"));
+                await ctx.EditResponseAsync(new DiscordWebhookBuilder().WithContent($"Joined voice channel '{channel!.Name}'.  You will need this ID to retrieve your recording, remember it: `{session.SessionId}`"));
 
                 if ((await ReadMusicIndexAsync(cfg)).TryGetValue("now-recording", out string? origPath))
                 {
@@ -123,12 +123,12 @@ internal sealed class GraciousCommandModule : ApplicationCommandModule
 
             if (ctx.Client.GetVoiceNext().GetConnection(ctx.Guild) is VoiceNextConnection conn)
             {
-                await ctx.CreateResponseAsync(InteractionResponseType.ChannelMessageWithSource, new DiscordInteractionResponseBuilder().WithContent($"Stopping the recording that's in progress for '{conn.TargetChannel.Name}'...\n\n{SourceOffer}"));
+                await ctx.CreateResponseAsync(InteractionResponseType.ChannelMessageWithSource, new DiscordInteractionResponseBuilder().WithContent($"Stopping the recording that's in progress for '{conn.TargetChannel.Name}'..."));
 
                 try
                 {
                     GraciousSession session = await _sessions.EndAsync(ctx.User, ctx.Guild.Id);
-                    await ctx.EditResponseAsync(new DiscordWebhookBuilder().WithContent($"Finished recording and left '{conn.TargetChannel.Name}'.  Remember your recording ID!  Here it is again: `{session.SessionId}`\n\n{SourceOffer}"));
+                    await ctx.EditResponseAsync(new DiscordWebhookBuilder().WithContent($"Finished recording and left '{conn.TargetChannel.Name}'.  Remember your recording ID!  Here it is again: `{session.SessionId}`"));
                 }
                 catch (SessionStartedBySomeoneElseException)
                 {
@@ -176,13 +176,13 @@ internal sealed class GraciousCommandModule : ApplicationCommandModule
 
             string emergencyFolderPath = jank.Resolve(cfg.EmergencyFolder);
             string rawFilePath = Path.Combine(emergencyFolderPath, "raw.dat");
-            await ctx.CreateResponseAsync(InteractionResponseType.ChannelMessageWithSource, new DiscordInteractionResponseBuilder().WithContent($"Started building the output file for you to download.  It takes a while, please be patient...\n\n{SourceOffer}"));
+            await ctx.CreateResponseAsync(InteractionResponseType.ChannelMessageWithSource, new DiscordInteractionResponseBuilder().WithContent($"Started building the output file for you to download.  It takes a while, please be patient..."));
 
             try
             {
                 await GraciousFinalize.FinalizeAsync(ctx.Client.CurrentUser, rawFilePath, Path.Combine(emergencyFolderPath, Path.GetRandomFileName()), jank.Resolve(cfg.OutputFile));
 
-                await ctx.EditResponseAsync(new DiscordWebhookBuilder().WithContent($"Finished!  Download your file now: {jank.Resolve(cfg.DownloadUrl)}\n\n{SourceOffer}"));
+                await ctx.EditResponseAsync(new DiscordWebhookBuilder().WithContent($"Finished!  Download your file now: {jank.Resolve(cfg.DownloadUrl)}"));
             }
             catch (SessionDoesNotExistException)
             {
@@ -207,7 +207,7 @@ internal sealed class GraciousCommandModule : ApplicationCommandModule
         async ValueTask Core()
         {
             GraciousConfiguration cfg = _cfg.CurrentValue;
-            await ctx.CreateResponseAsync(InteractionResponseType.ChannelMessageWithSource, new DiscordInteractionResponseBuilder().WithContent($"Preparing all music files for streaming (compression level: {CompressionOptions.MaxCompressionLevel})...\n\n{SourceOffer}"));
+            await ctx.CreateResponseAsync(InteractionResponseType.ChannelMessageWithSource, new DiscordInteractionResponseBuilder().WithContent($"Preparing all music files for streaming (compression level: {CompressionOptions.MaxCompressionLevel})..."));
             await Parallel.ForEachAsync((await ReadMusicIndexAsync(cfg)).Values, async (origPath, cancellationToken) =>
             {
                 string pcmPath = origPath + ".pcm.zst";
@@ -217,7 +217,7 @@ internal sealed class GraciousCommandModule : ApplicationCommandModule
                 }
             });
 
-            await ctx.EditResponseAsync(new DiscordWebhookBuilder().WithContent($"Done.  All streamable music files are ready for immediate streaming.\n\n{SourceOffer}"));
+            await ctx.EditResponseAsync(new DiscordWebhookBuilder().WithContent($"Done.  All streamable music files are ready for immediate streaming."));
         }
     }
 
@@ -260,18 +260,18 @@ internal sealed class GraciousCommandModule : ApplicationCommandModule
             string pcmPath = origPath + ".pcm.zst";
             if (File.Exists(pcmPath))
             {
-                await ctx.CreateResponseAsync(InteractionResponseType.ChannelMessageWithSource, new DiscordInteractionResponseBuilder().WithContent($"Playing '{file}' now...\n\n{SourceOffer}"));
+                await ctx.CreateResponseAsync(InteractionResponseType.ChannelMessageWithSource, new DiscordInteractionResponseBuilder().WithContent($"Playing '{file}' now..."));
             }
             else
             {
-                await ctx.CreateResponseAsync(InteractionResponseType.ChannelMessageWithSource, new DiscordInteractionResponseBuilder().WithContent($"'{file}' was added since the last '/prepare' command, so it's not immediately ready for streaming.  I can do it now, no problem; it'll just take a hot minute...\n\n{SourceOffer}"));
+                await ctx.CreateResponseAsync(InteractionResponseType.ChannelMessageWithSource, new DiscordInteractionResponseBuilder().WithContent($"'{file}' was added since the last '/prepare' command, so it's not immediately ready for streaming.  I can do it now, no problem; it'll just take a hot minute..."));
                 await PrepareAsync(origPath, pcmPath);
                 await ctx.EditResponseAsync(new DiscordWebhookBuilder().WithContent($"Playing '{file}' now..."));
             }
 
             try
             {
-                session.PlayMusic(pcmPath, async () => await ctx.EditResponseAsync(new DiscordWebhookBuilder().WithContent($"Done playing '{file}'.\n\n{SourceOffer}")));
+                session.PlayMusic(pcmPath, async () => await ctx.EditResponseAsync(new DiscordWebhookBuilder().WithContent($"Done playing '{file}'.")));
             }
             catch (AlreadyPlayingMusicException)
             {
@@ -322,9 +322,9 @@ internal sealed class GraciousCommandModule : ApplicationCommandModule
             Log.Information(origDirectoryPath);
             Directory.CreateDirectory(lazyDirectoryPath);
 
-            await ctx.CreateResponseAsync(InteractionResponseType.ChannelMessageWithSource, new DiscordInteractionResponseBuilder().WithContent($"Hi lazy person!  I'm starting the process of building up that .mkv file for you, so that you can move on to other things.  Please wait while I extract the public zip file...\n\n{SourceOffer}"));
+            await ctx.CreateResponseAsync(InteractionResponseType.ChannelMessageWithSource, new DiscordInteractionResponseBuilder().WithContent($"Hi lazy person!  I'm starting the process of building up that .mkv file for you, so that you can move on to other things.  Please wait while I extract the public zip file..."));
             await Task.Run(() => file.ExtractToDirectory(lazyDirectoryPath, true));
-            await ctx.EditResponseAsync(new DiscordWebhookBuilder().WithContent($"Hi lazy person!  I'm starting the process of building up that .mkv file for you, so that you can move on to other things.  Cool, that .zip file was extracted just fine!  Now for the hard part: combining the secret stuff that we recorded *just for us* on the side...\n\n{SourceOffer}"));
+            await ctx.EditResponseAsync(new DiscordWebhookBuilder().WithContent($"Hi lazy person!  I'm starting the process of building up that .mkv file for you, so that you can move on to other things.  Cool, that .zip file was extracted just fine!  Now for the hard part: combining the secret stuff that we recorded *just for us* on the side..."));
 
             List<string> args = new()
             {
@@ -413,7 +413,7 @@ internal sealed class GraciousCommandModule : ApplicationCommandModule
             ffmpeg.Start();
             await ffmpeg.End();
 
-            await ctx.EditResponseAsync(new DiscordWebhookBuilder().WithContent($"Hi lazy person!  I've built up that .mkv file for you.  It's at `{mkvPath}`.\n\n{SourceOffer}"));
+            await ctx.EditResponseAsync(new DiscordWebhookBuilder().WithContent($"Hi lazy person!  I've built up that .mkv file for you.  It's at `{mkvPath}`."));
         }
     }
 
