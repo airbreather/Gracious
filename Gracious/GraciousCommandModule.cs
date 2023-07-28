@@ -80,7 +80,7 @@ internal sealed class GraciousCommandModule : ApplicationCommandModule
             try
             {
                 GraciousSession session = await _sessions.BeginAsync(ctx.User, channel);
-                await ctx.EditResponseAsync(new DiscordWebhookBuilder().WithContent($"Joined voice channel '{channel!.Name}'.  You will need this ID to retrieve your recording, remember it: `{session.SessionId}`"));
+                await ctx.EditResponseAsync(new DiscordWebhookBuilder().WithContent($"Joined voice channel '{channel!.Name}'.  You will need this ID to retrieve your recording, remember it: `{session.SessionId}`\n\n{SourceOffer}"));
 
                 if ((await ReadMusicIndexAsync(cfg)).TryGetValue("now-recording", out string? origPath))
                 {
