@@ -15,22 +15,59 @@ internal static class PacketReader
     public static async IAsyncEnumerable<Packet> ReadAsync(FileStream stream)
     {
         byte[] buf = new byte[4096];
-        while (await stream.ReadOptionalAsync<PacketHeader>(buf) is PacketHeader header)
+        while (true)
         {
-            if (header.PacketSizeBytes > buf.Length)
+            PacketHeader? headerOrNull;
+            try
             {
-                long newLen = buf.Length;
-                while (header.PacketSizeBytes > newLen)
-                {
-                    newLen = Math.Min(int.MaxValue, newLen + newLen);
-                }
-
-                buf = new byte[newLen];
+                headerOrNull = await stream.ReadOptionalAsync<PacketHeader>(buf);
+            }
+            catch (EndOfStreamException)
+            {
+                // the application was terminated abruptly while writing this packet.
+                break;
             }
 
-            Memory<byte> payload = buf.AsMemory(..header.PacketSizeBytes);
-            await stream.ReadExactlyAsync(payload);
+            if (headerOrNull is not PacketHeader header)
+            {
+                // the application successfully wrote all the packets that it intended to write, and
+                // we've yielded the last of them, so we can stop now.
+                break;
+            }
+
+            Memory<byte> payload = GrowIfNeededThenSlice(ref buf, header.PacketSizeBytes);
+            try
+            {
+                await stream.ReadExactlyAsync(payload);
+            }
+            catch (EndOfStreamException)
+            {
+                // the application was terminated abruptly while writing this packet.
+                break;
+            }
+
             yield return new(header.PacketType, header.PacketStartTimestamp, payload.ToArray());
         }
+    }
+
+    private static Memory<byte> GrowIfNeededThenSlice(ref byte[] buf, int len)
+    {
+        if (len > buf.Length)
+        {
+            EnsureMinLength(ref buf, len);
+        }
+
+        return buf.AsMemory(..len);
+    }
+
+    private static void EnsureMinLength(ref byte[] buf, int minLen)
+    {
+        long newLen = buf.Length;
+        while (minLen > newLen)
+        {
+            newLen = Math.Min(int.MaxValue, newLen + newLen);
+        }
+
+        buf = new byte[newLen];
     }
 }
