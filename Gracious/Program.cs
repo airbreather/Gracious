@@ -32,7 +32,7 @@ hostBuilder.UseSerilog((ctx, cfg) => cfg.ReadFrom.Configuration(ctx.Configuratio
 
 hostBuilder.ConfigureAppConfiguration(builder =>
 {
-    builder.AddJsonFile(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Personal), "secret-discord-config.json"), optional: false, reloadOnChange: true);
+    builder.AddJsonFile(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "secret-discord-config.json"), optional: false, reloadOnChange: true);
 });
 
 hostBuilder.ConfigureServices(
