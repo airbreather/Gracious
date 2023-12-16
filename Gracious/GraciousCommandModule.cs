@@ -317,7 +317,7 @@ internal sealed class GraciousCommandModule : ApplicationCommandModule
             }
 
             using var _ = file;
-            string lazyDirectoryPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Personal), "Audio", $"{sessionId}");
+            string lazyDirectoryPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "Audio", $"{sessionId}");
             string origDirectoryPath = jank.Resolve(cfg.EmergencyFolder);
             Log.Information(origDirectoryPath);
             Directory.CreateDirectory(lazyDirectoryPath);
