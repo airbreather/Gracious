@@ -18,5 +18,7 @@ internal sealed record FfmpegArgs
 
     public required string Input { get; init; }
 
-    public Collection<string> OutputFlags { get; } = [];
+    public Collection<string> RealtimeOutputFlags { get; } = [];
+
+    public Collection<string> OfflineOutputFlags { get; } = [];
 }

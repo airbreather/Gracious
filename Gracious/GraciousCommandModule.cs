@@ -359,8 +359,7 @@ internal sealed class GraciousCommandModule : ApplicationCommandModule
 
             args.Add($"{filterComplexBuilder}");
 
-            args.Add("-c:v");
-            args.Add("copy");
+            args.AddRange(cfg.DesktopRecordingFfmpegArgs.DesktopScreen.OfflineOutputFlags);
 
             args.Add("-map");
             args.Add("0:v");
@@ -369,17 +368,13 @@ internal sealed class GraciousCommandModule : ApplicationCommandModule
             if (myUserIndex > 0)
             {
                 args.Add("[desktopAndMe]");
-
-                args.Add("-c:a:0");
-                args.Add("flac");
             }
             else
             {
                 args.Add("0:a");
-
-                args.Add("-c:a:0");
-                args.Add("copy");
             }
+
+            args.AddRange(cfg.DesktopRecordingFfmpegArgs.DesktopAudio.OfflineOutputFlags.Select(f => f.Replace("{streamIndex}", "0")));
 
             args.Add("-metadata:s:a:0");
             args.Add("title=Desktop");
@@ -387,8 +382,8 @@ internal sealed class GraciousCommandModule : ApplicationCommandModule
             args.Add("-map");
             args.Add("[allAudioInputsCombined]");
 
-            args.Add("-c:a:1");
-            args.Add("flac");
+            // I know it's not technically "desktop audio".  I won't tell anyone if you don't.
+            args.AddRange(cfg.DesktopRecordingFfmpegArgs.DesktopAudio.OfflineOutputFlags.Select(f => f.Replace("{streamIndex}", "1")));
 
             args.Add("-metadata:s:a:1");
             args.Add("title=AllAudioInputsCombined");
@@ -398,8 +393,8 @@ internal sealed class GraciousCommandModule : ApplicationCommandModule
                 args.Add("-map");
                 args.Add($"{i + 1}:0");
 
-                args.Add($"-c:a:{i + 2}");
-                args.Add($"copy");
+                // I know it's not technically "desktop audio".  I won't tell anyone if you don't.
+                args.AddRange(cfg.DesktopRecordingFfmpegArgs.DesktopAudio.OfflineOutputFlags.Select(f => f.Replace("{streamIndex}", $"{i + 2}")));
                 if (usernameToTitle.TryGetValue(usernames[i], out (string Title, int Index) tup))
                 {
                     args.Add($"-metadata:s:a:{i + 2}");

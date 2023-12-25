@@ -30,8 +30,8 @@ internal sealed class PrivateGraciousSession
                 "-i", args.DesktopScreen.Input,
                 ..args.DesktopAudio.InputFlags,
                 "-i", args.DesktopAudio.Input,
-                ..args.DesktopScreen.OutputFlags,
-                ..args.DesktopAudio.OutputFlags,
+                ..args.DesktopScreen.RealtimeOutputFlags,
+                ..args.DesktopAudio.RealtimeOutputFlags,
                 "-map", "0",
                 "-map", "1",
             ];
