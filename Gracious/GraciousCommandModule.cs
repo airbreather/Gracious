@@ -359,10 +359,10 @@ internal sealed class GraciousCommandModule : ApplicationCommandModule
 
             args.Add($"{filterComplexBuilder}");
 
-            args.AddRange(cfg.DesktopRecordingFfmpegArgs.DesktopScreen.OfflineOutputFlags);
-
             args.Add("-map");
             args.Add("0:v");
+
+            args.AddRange(cfg.DesktopRecordingFfmpegArgs.DesktopScreen.OfflineOutputFlags);
 
             args.Add("-map");
             if (myUserIndex > 0)
