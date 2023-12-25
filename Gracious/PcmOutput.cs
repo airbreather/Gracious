@@ -19,7 +19,7 @@ namespace Gracious;
 
 internal sealed class PcmOutput : IAsyncDisposable
 {
-    private readonly BlockingCollection<Packet> _packets = new();
+    private readonly BlockingCollection<Packet> _packets = [];
 
     private readonly FfmpegProcessWrapper _ffmpeg;
 
@@ -163,8 +163,8 @@ internal sealed class PcmOutput : IAsyncDisposable
 
     private static string[] FfmpegArgs(int channelCount, int sampleRate)
     {
-        return new[]
-        {
+        return
+        [
             "-ac", $"{channelCount}",
             "-ar", $"{sampleRate}",
             "-f", "s16le",
@@ -172,6 +172,6 @@ internal sealed class PcmOutput : IAsyncDisposable
             "-ac", "2",
             "-ar", "48000",
             "-f", "flac",
-        };
+        ];
     }
 }

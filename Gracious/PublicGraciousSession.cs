@@ -26,7 +26,7 @@ internal sealed class PublicGraciousSession
         _musicSender = new(connection);
     }
 
-    public Dictionary<string, int> TransmitFilePaths { get; } = new Dictionary<string, int>();
+    public Dictionary<string, int> TransmitFilePaths { get; } = [];
 
     public void Start()
     {

@@ -26,9 +26,9 @@ internal sealed record GraciousConfiguration
 
     public required bool RegisterDefaultApplicationCommands { get; init; }
 
-    public Collection<UsernameTitleMappingConfiguration> UsernameTitleMappings { get; } = new();
+    public Collection<UsernameTitleMappingConfiguration> UsernameTitleMappings { get; } = [];
 
-    public Collection<ulong> GuildIdsForApplicationCommands { get; } = new();
+    public Collection<ulong> GuildIdsForApplicationCommands { get; } = [];
 
     public required DesktopRecordingFfmpegArgs DesktopRecordingFfmpegArgs { get; init; }
 }

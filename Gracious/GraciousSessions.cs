@@ -20,7 +20,7 @@ internal sealed class GraciousSessions
 {
     private readonly SemaphoreSlimWrapper _sem = new(1, 1);
 
-    private readonly Dictionary<ulong, GraciousSession> _sessionsByGuildId = new();
+    private readonly Dictionary<ulong, GraciousSession> _sessionsByGuildId = [];
 
     private readonly IOptionsMonitor<GraciousConfiguration> _cfgSnapshot;
 

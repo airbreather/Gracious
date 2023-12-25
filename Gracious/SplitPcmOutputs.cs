@@ -18,7 +18,7 @@ internal sealed class SplitPcmOutputs : IAsyncDisposable
 {
     private readonly Dictionary<uint, string> _ssrcMap;
 
-    private readonly Dictionary<string, PcmOutput> _outputs = new();
+    private readonly Dictionary<string, PcmOutput> _outputs = [];
 
     private readonly string _botUsername;
 
@@ -95,7 +95,7 @@ internal sealed class SplitPcmOutputs : IAsyncDisposable
             }
             catch (Exception ex)
             {
-                (exceptionsToThrow ??= new()).Add(ex);
+                (exceptionsToThrow ??= []).Add(ex);
             }
         }
 

@@ -326,15 +326,15 @@ internal sealed class GraciousCommandModule : ApplicationCommandModule
             await Task.Run(() => file.ExtractToDirectory(lazyDirectoryPath, true));
             await ctx.EditResponseAsync(new DiscordWebhookBuilder().WithContent($"Hi lazy person!  I'm starting the process of building up that .mkv file for you, so that you can move on to other things.  Cool, that .zip file was extracted just fine!  Now for the hard part: combining the secret stuff that we recorded *just for us* on the side..."));
 
-            List<string> args = new()
-            {
+            List<string> args =
+            [
                 "-y",
                 "-i", Path.Combine(origDirectoryPath, "Desktop.mkv"),
-            };
+            ];
 
             string myUser = $"{ctx.User.Username}#{ctx.User.Discriminator}";
             int myUserIndex = -1;
-            List<string> usernames = new();
+            List<string> usernames = [];
 
             foreach (string extractedFile in Directory.EnumerateFiles(lazyDirectoryPath, "*.flac")
                 .OrderBy(u => usernameToTitle.TryGetValue(Path.GetFileNameWithoutExtension(u), out (string Title, int Index) tup) ? tup.Index : int.MaxValue))

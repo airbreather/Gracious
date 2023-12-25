@@ -102,7 +102,7 @@ internal static class GraciousFinalize
         }
 
         await using var __ = inputFile;
-        Dictionary<uint, string> map = new();
+        Dictionary<uint, string> map = [];
         await foreach (Packet packet in PacketReader.ReadAsync(inputFile))
         {
             switch (packet.Type)

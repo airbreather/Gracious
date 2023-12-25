@@ -24,35 +24,29 @@ internal sealed class PrivateGraciousSession
             string audioOnlyPath = Path.Combine(emergencyFolderPath, "Audio.flac");
             string combinedPath = Path.Combine(emergencyFolderPath, "Desktop.mkv");
 
-            List<string> combinedArgs = new();
-            combinedArgs.AddRange(args.DesktopScreen.InputFlags);
-            combinedArgs.Add("-i");
-            combinedArgs.Add(args.DesktopScreen.Input);
-
-            combinedArgs.AddRange(args.DesktopAudio.InputFlags);
-            combinedArgs.Add("-i");
-            combinedArgs.Add(args.DesktopAudio.Input);
-
-            combinedArgs.AddRange(args.DesktopScreen.OutputFlags);
-            combinedArgs.AddRange(args.DesktopAudio.OutputFlags);
-
-            combinedArgs.Add("-map");
-            combinedArgs.Add("0");
-            combinedArgs.Add("-map");
-            combinedArgs.Add("1");
+            List<string> combinedArgs =
+            [
+                ..args.DesktopScreen.InputFlags,
+                "-i", args.DesktopScreen.Input,
+                ..args.DesktopAudio.InputFlags,
+                "-i", args.DesktopAudio.Input,
+                ..args.DesktopScreen.OutputFlags,
+                ..args.DesktopAudio.OutputFlags,
+                "-map", "0",
+                "-map", "1",
+            ];
 
             // https://trac.ffmpeg.org/ticket/10131
             const bool FFMPEG_10131_IS_FIXED = false;
             if (FFMPEG_10131_IS_FIXED)
             {
-                combinedArgs.Add("-f");
-                combinedArgs.Add("tee");
-                combinedArgs.Add("-use_fifo");
-                combinedArgs.Add("1");
-                combinedArgs.Add("-fifo_options");
-                combinedArgs.Add("queue_size=200:drop_pkts_on_overflow=1:attempt_recovery=1:recover_any_error=1:recovery_wait_time=100ms");
-
-                combinedArgs.Add($"[select=v]{videoOnlyPath}|[select=a]{audioOnlyPath}|[select=v,a]{combinedPath}");
+                combinedArgs.AddRange(
+                [
+                    "-f", "tee",
+                    "-use_fifo", "1",
+                    "-fifo_options", "queue_size=200:drop_pkts_on_overflow=1:attempt_recovery=1:recover_any_error=1:recovery_wait_time=100ms",
+                    $"[select=v]{videoOnlyPath}|[select=a]{audioOnlyPath}|[select=v,a]{combinedPath}",
+                ]);
             }
             else
             {

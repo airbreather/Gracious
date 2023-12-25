@@ -63,7 +63,7 @@ hostBuilder.ConfigureServices(
                 voiceCfg.EnableIncoming = true;
             });
 
-        services.AddSingleton<DiscordClient>(serviceProvider =>
+        services.AddSingleton(serviceProvider =>
         {
             DiscordConfiguration discordCfg = serviceProvider.GetRequiredService<IOptions<DiscordConfiguration>>().Value;
             VoiceNextConfiguration voiceCfg = serviceProvider.GetRequiredService<IOptions<VoiceNextConfiguration>>().Value;
