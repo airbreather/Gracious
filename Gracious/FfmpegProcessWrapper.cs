@@ -77,11 +77,11 @@ internal sealed class FfmpegProcessWrapper : IDisposable
             : new(args, null, infiniteInput);
     }
 
-    public static FfmpegProcessWrapper? Create(IReadOnlyCollection<string> args, Stream outputStream, bool infiniteInput = false)
+    public static FfmpegProcessWrapper? Create(IReadOnlyCollection<string> args, Stream outputStream)
     {
         return args.Count == 0
             ? null
-            : new(args.Append("pipe:1"), outputStream, infiniteInput);
+            : new(args.Append("pipe:1"), outputStream, infiniteInput: false);
     }
 
     public async ValueTask WriteToStdinAsync(ReadOnlyMemory<byte> data, CancellationToken cancellationToken = default)
@@ -182,8 +182,15 @@ internal sealed class FfmpegProcessWrapper : IDisposable
 
             if (_needsExplicitQuitSignal)
             {
-                await _process.StandardInput.WriteAsync('q');
-                await _process.StandardInput.FlushAsync();
+                try
+                {
+                    await _process.StandardInput.WriteAsync('q');
+                    await _process.StandardInput.FlushAsync();
+                }
+                catch (IOException ex)
+                {
+                    Log.Error(ex, "{id}: An unexpected error occurred when trying to end a ffmpeg process gracefully.  Continuing anyway.", _id);
+                }
             }
 
             await _process.StandardInput.BaseStream.DisposeAsync();
