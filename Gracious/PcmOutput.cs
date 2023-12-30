@@ -25,14 +25,12 @@ internal sealed class PcmOutput : IAsyncDisposable
 
     private readonly Task _writingTask;
 
-    public PcmOutput(int sampleRate, int channelCount, long streamStartTimestamp, long ticksPerSecond, Stream outputStream)
+    public PcmOutput(int sampleRate, int channelCount, long streamStartTimestamp, long ticksPerSecond, string outputPath)
     {
-        _ffmpeg = FfmpegProcessWrapper.Create(FfmpegArgs(channelCount: channelCount, sampleRate: sampleRate), outputStream) ?? throw new InvalidOperationException("ffmpeg wrapper should not return null for non-empty arg list");
+        _ffmpeg = FfmpegProcessWrapper.Create(FfmpegArgs(channelCount: channelCount, sampleRate: sampleRate, outputPath: outputPath)) ?? throw new InvalidOperationException("ffmpeg wrapper should not return null for non-empty arg list");
         _ffmpeg.Start();
         _writingTask = Task.Run(async () =>
         {
-            await using var __ = outputStream;
-
             double samplesPerTick = sampleRate / (double)ticksPerSecond;
 
             // any time we received a payload within 0.5 seconds of receiving another payload for the
@@ -161,18 +159,20 @@ internal sealed class PcmOutput : IAsyncDisposable
         _packets.Dispose();
     }
 
-    private static string[] FfmpegArgs(int channelCount, int sampleRate)
+    private static string[] FfmpegArgs(int channelCount, int sampleRate, string outputPath)
     {
         return
         [
+            "-hide_banner",
+            "-y",
             "-ac", $"{channelCount}",
             "-ar", $"{sampleRate}",
             "-f", "s16le",
             "-i", "pipe:0",
             "-ac", "2",
             "-ar", "48000",
-            "-f", "flac",
             "-compression_level", "12",
+            outputPath,
         ];
     }
 }

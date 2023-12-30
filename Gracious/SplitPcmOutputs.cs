@@ -73,7 +73,7 @@ internal sealed class SplitPcmOutputs : IAsyncDisposable
             }
 
             ref PcmOutput? output = ref CollectionsMarshal.GetValueRefOrAddDefault(_outputs, finalName, out _);
-            output ??= new(sampleRate, channelCount, _startTimestamp, _ticksPerSecond, Files.CreateAsync(Path.Combine(_outputDirectory, $"{finalName}.flac")));
+            output ??= new(sampleRate, channelCount, _startTimestamp, _ticksPerSecond, Path.Combine(_outputDirectory, $"{finalName}.flac"));
             return output;
         }
     }
