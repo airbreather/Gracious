@@ -9,7 +9,7 @@
             "type": "coreclr",
             "request": "launch",
             "preLaunchTask": "build",
-            "program": "${workspaceFolder}/Gracious/bin/Debug/net7.0/Gracious.dll",
+            "program": "${workspaceFolder}/Gracious/bin/Debug/net8.0/Gracious.dll",
             "args": [],
             "cwd": "${workspaceFolder}",
             "stopAtEntry": false,

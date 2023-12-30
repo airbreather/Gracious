@@ -31,7 +31,7 @@ internal sealed class PrivateGraciousSession
                 ..args.DesktopAudio.InputFlags,
                 "-i", args.DesktopAudio.Input,
                 ..args.DesktopScreen.RealtimeOutputFlags,
-                ..args.DesktopAudio.RealtimeOutputFlags,
+                ..args.DesktopAudio.RealtimeOutputFlags.Select(f => f.Replace("{streamIndex}", "0")),
                 "-map", "0",
                 "-map", "1",
             ];
