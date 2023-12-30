@@ -406,9 +406,9 @@ internal sealed class GraciousCommandModule : ApplicationCommandModule
             args.Add(mkvPath);
             using FfmpegProcessWrapper ffmpeg = FfmpegProcessWrapper.Create(args) ?? throw new InvalidOperationException("ffmpeg wrapper should not return null for non-empty arg list");
             ffmpeg.Start();
+            await ctx.EditResponseAsync(new DiscordWebhookBuilder().WithContent($"Hi lazy person!  I've started building up that .mkv file for you.  Discord only lets me edit this message for 15 minutes after it was created in the first place, and this actually runs for **hours** these days, so you'll have to check the log to see when it's actually done.  When it is, it will be at: `{mkvPath}`"));
             await ffmpeg.End();
-
-            await ctx.EditResponseAsync(new DiscordWebhookBuilder().WithContent($"Hi lazy person!  I've built up that .mkv file for you.  It's at `{mkvPath}`."));
+            _logger.LogInformation("'/joe-is-lazy' command finished writing to '{mkvPath}' at {timestamp:o}", mkvPath, DateTimeOffset.Now);
         }
     }
 
