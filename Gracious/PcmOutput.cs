@@ -172,6 +172,7 @@ internal sealed class PcmOutput : IAsyncDisposable
             "-ac", "2",
             "-ar", "48000",
             "-f", "flac",
+            "-compression_level", "12",
         ];
     }
 }
