@@ -124,6 +124,7 @@ internal sealed class FfmpegProcessWrapper : IDisposable
 
             if (Log.IsEnabled(LogEventLevel.Debug))
             {
+                Log.Debug("{id}: ffmpeg {args}", _id, string.Join(' ', _startInfo.ArgumentList.Select(arg => $"'{arg.Replace("'", "'\\''")}")));
                 _process.ErrorDataReceived += OnErrorDataReceived;
             }
 
