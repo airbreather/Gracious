@@ -1,7 +1,8 @@
-import { Client, Collection, Events, GatewayIntentBits } from 'discord.js';
 import * as os from 'os';
 import * as path from 'path';
 import * as yaml from 'yaml';
+
+import { Client, Collection, Events, GatewayIntentBits } from 'discord.js';
 
 import { allCommands } from './commands';
 import deployCommands from './deploy-commands';
@@ -29,11 +30,12 @@ export interface AppConfig {
 
 const appConfig: AppConfig = yaml.parse(await Bun.file(path.join(os.homedir(), 'secret-discord-config.yml')).text());
 
-const deployCommandsPromise = deployCommands(appConfig);
+await deployCommands(appConfig);
 
-const client = new Client({ intents: [GatewayIntentBits.GuildVoiceStates] });
-
+const client = new Client({ intents: [GatewayIntentBits.GuildVoiceStates, GatewayIntentBits.Guilds] });
+client.appConfig = appConfig;
 client.commands = new Collection();
+
 for (const [k, v] of Object.entries(allCommands)) {
     client.commands.set(k, v);
 }
@@ -64,5 +66,10 @@ client.on(Events.InteractionCreate, async interaction => {
     }
 });
 
-await deployCommandsPromise;
-client.login(appConfig.botToken);
+client.on(Events.Error, (err) => console.error(err));
+
+await client.login(appConfig.botToken);
+
+process.on('SIGINT', async () => {
+    await client.destroy();
+});
