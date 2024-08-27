@@ -3,8 +3,9 @@ import * as path from 'path';
 import * as yaml from 'yaml';
 
 import { Client, Collection, Events, GatewayIntentBits } from 'discord.js';
+import type { VoiceConnection } from '@discordjs/voice';
 
-import { allCommands } from './commands';
+import { allCommands, type ConventionalCommand } from './commands';
 import deployCommands from './deploy-commands';
 
 type SingleStringProperty = Readonly<{ [key: string]: string } & Record<string, never>>;
@@ -33,11 +34,18 @@ const appConfig: AppConfig = yaml.parse(await Bun.file(path.join(os.homedir(), '
 await deployCommands(appConfig);
 
 const client = new Client({ intents: [GatewayIntentBits.GuildVoiceStates, GatewayIntentBits.Guilds] });
-client.appConfig = appConfig;
-client.commands = new Collection();
+
+const data = {
+    appConfig,
+    commands: new Collection<string, ConventionalCommand>(),
+    voiceConnections: new Collection<string, VoiceConnection>(),
+};
+
+declare module 'discord.js' { interface Client { data: typeof data; } };
+client.data = data;
 
 for (const [k, v] of Object.entries(allCommands)) {
-    client.commands.set(k, v);
+    client.data.commands.set(k, v);
 }
 
 client.once(Events.ClientReady, readyClient => {
@@ -47,7 +55,7 @@ client.once(Events.ClientReady, readyClient => {
 client.on(Events.InteractionCreate, async interaction => {
     if (!interaction.isChatInputCommand()) return;
 
-    const command = interaction.client.commands.get(interaction.commandName);
+    const command = interaction.client.data.commands.get(interaction.commandName);
 
     if (!command) {
         console.error(`No command matching ${interaction.commandName} was found.`);

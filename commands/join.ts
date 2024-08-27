@@ -20,20 +20,16 @@ const getDisplayName = (userId: string, user?: User) => {
     return user ? `${user.username}_${user.discriminator}` : userId;
 };
 
-const loopsRunning = new Map<string, VoiceConnection>();
-
 const runReceiveLoop = async (guildId: string, connection: VoiceConnection, client: Client) => {
-    if (loopsRunning.get(guildId) === connection) {
+    let { voiceConnections, appConfig } = client.data;
+    if (voiceConnections.get(guildId) === connection) {
         return;
     }
 
-    loopsRunning.set(guildId, connection);
+    voiceConnections.set(guildId, connection);
     connection.receiver.speaking.on('start', async (userId) => {
         const receiveStream = connection.receiver.subscribe(userId, {
-            end: {
-                behavior: EndBehaviorType.AfterSilence,
-                duration: 1000,
-            },
+            end: { behavior: EndBehaviorType.Manual },
         });
 
         const oggStream = new prism.opus.OggLogicalBitstream({
@@ -46,13 +42,21 @@ const runReceiveLoop = async (guildId: string, connection: VoiceConnection, clie
             },
         });
 
-        const fileName = path.join(client.appConfig.workingDirectoryPathBase, `${Date.now()}-${getDisplayName(userId, client.users.cache.get(userId))}.opus`);
+        const fileName = path.join(appConfig.workingDirectoryPathBase, `${Date.now()}-${getDisplayName(userId, client.users.cache.get(userId))}.opus`);
         const file = fs.createWriteStream(fileName);
         try {
             await stream.pipeline(receiveStream, oggStream, file);
             console.log(`✅ Recorded ${fileName}`);
         } catch (err) {
             console.warn(`❌ Error recording file ${fileName} - ${err}`);
+        }
+    });
+
+    // TODO: ...actually I don't know what to do, but it MIGHT not be this?
+    connection.receiver.speaking.on('end', userId => {
+        const receiveStream = connection.receiver.subscriptions.get(userId);
+        if (receiveStream) {
+            receiveStream.push(null);
         }
     });
 }
