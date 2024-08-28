@@ -33,7 +33,7 @@ const runReceiveLoop = async (connection: VoiceConnection, start: number, dir: s
         });
 
         const user = await client.users.fetch(userId);
-        const fileName = path.join(dir, `${user.username}.${elapsed}.opus`);
+        const fileName = path.join(dir, `${user.tag}.${elapsed}.opus`);
         const file = fs.createWriteStream(fileName);
         try {
             await stream.pipeline(receiveStream, oggStream, file);
