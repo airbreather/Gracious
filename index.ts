@@ -3,7 +3,7 @@ import * as path from 'path';
 import * as yaml from 'yaml';
 
 import { Client, Collection, Events, GatewayIntentBits, User } from 'discord.js';
-import type { VoiceConnection } from '@discordjs/voice';
+import type { AudioReceiveStream } from '@discordjs/voice';
 
 import { allCommands, type ConventionalCommand } from './commands';
 import deployCommands from './deploy-commands';
@@ -38,7 +38,8 @@ const client = new Client({ intents: [GatewayIntentBits.GuildVoiceStates, Gatewa
 const data = {
     appConfig,
     commands: new Collection<string, ConventionalCommand>(),
-    voiceConnections: new Collection<string, VoiceConnection>(),
+    stopping: false,
+    activeStreams: [] as { receiveStream: AudioReceiveStream, flushed: Promise<void> }[],
 };
 
 declare module 'discord.js' { interface Client { data: typeof data; } };

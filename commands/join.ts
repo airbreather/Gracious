@@ -18,29 +18,50 @@ const data = new SlashCommandBuilder()
 
 const runReceiveLoop = async (connection: VoiceConnection, start: number, dir: string, client: Client) => {
     connection.receiver.speaking.on('start', async (userId) => {
+        if (client.data.stopping) {
+            return;
+        }
+
         const receiveStream = connection.receiver.subscribe(userId, {
             end: { behavior: EndBehaviorType.Manual },
             highWaterMark: 1 << 20, // allocate a generous 1 MiB buffer in case user fetch is slow.
         });
-        const elapsed = Date.now() - start;
-        const oggStream = new prism.opus.OggLogicalBitstream({
-            opusHead: new prism.opus.OpusHead({
-                channelCount: 2,
-                sampleRate: 48000,
-            }),
-            pageSizeControl: {
-                maxPackets: 10,
-            },
+        let toPush = { receiveStream, flushed: null! as Promise<void> };
+        const flushed = new Promise<void>(async (resolve, reject) => {
+            try {
+                const elapsed = Date.now() - start;
+                const oggStream = new prism.opus.OggLogicalBitstream({
+                    opusHead: new prism.opus.OpusHead({
+                        channelCount: 2,
+                        sampleRate: 48000,
+                    }),
+                    pageSizeControl: {
+                        maxPackets: 10,
+                    },
+                });
+
+                const user = await client.users.fetch(userId);
+                const fileName = path.join(dir, `${user.tag}.${elapsed}.opus`);
+                const file = fs.createWriteStream(fileName);
+                try {
+                    await stream.pipeline(receiveStream, oggStream, file);
+                } catch (err) {
+                    console.warn(`❌ Error recording file ${fileName} - ${err}`);
+                }
+
+                const idx = client.data.activeStreams.indexOf(toPush);
+                if (idx > -1) {
+                    client.data.activeStreams.splice(idx, 1);
+                }
+
+                resolve();
+            } catch (err) {
+                reject(err);
+            }
         });
 
-        const user = await client.users.fetch(userId);
-        const fileName = path.join(dir, `${user.tag}.${elapsed}.opus`);
-        const file = fs.createWriteStream(fileName);
-        try {
-            await stream.pipeline(receiveStream, oggStream, file);
-        } catch (err) {
-            console.warn(`❌ Error recording file ${fileName} - ${err}`);
-        }
+        toPush.flushed = flushed;
+        client.data.activeStreams.push(toPush);
     });
 
     connection.receiver.speaking.on('end', userId => {

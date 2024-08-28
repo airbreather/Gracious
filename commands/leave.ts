@@ -24,6 +24,17 @@ const execute = async (interaction: RepliableInteraction) => {
         return;
     }
 
+    const data = interaction.client.data;
+    data.stopping = true;
+    try {
+        await Promise.all(data.activeStreams.map(async s => {
+            s.receiveStream.push(null);
+            await s.flushed;
+        }));
+    } finally {
+        data.stopping = false;
+    }
+
     const channel = (await interaction.guild.voiceStates.fetch('@me')).channel;
     const disconnected = connection.disconnect();
     if (disconnected) {
