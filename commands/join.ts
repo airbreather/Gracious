@@ -3,7 +3,7 @@ import * as stream from 'node:stream/promises';
 import * as path from 'path';
 import * as prism from 'prism-media';
 
-import { ChannelType, Client, GuildMember, SlashCommandBuilder, User, type RepliableInteraction } from 'discord.js';
+import { ChannelType, Client, GuildMember, SlashCommandBuilder, type RepliableInteraction } from 'discord.js';
 import { EndBehaviorType, getVoiceConnection, joinVoiceChannel, VoiceConnection } from '@discordjs/voice';
 
 import type { ConventionalCommand } from '.';
@@ -16,22 +16,14 @@ const data = new SlashCommandBuilder()
         .setDescription('What channel to join, or leave it blank for me to join your current one.')
         .addChannelTypes(ChannelType.GuildVoice));
 
-const getDisplayName = (userId: string, user?: User) => {
-    return user ? `${user.username}_${user.discriminator}` : userId;
-};
-
-const runReceiveLoop = async (guildId: string, connection: VoiceConnection, client: Client) => {
-    let { voiceConnections, appConfig } = client.data;
-    if (voiceConnections.get(guildId) === connection) {
-        return;
-    }
-
+const runReceiveLoop = async (guildId: string, connection: VoiceConnection, start: number, dir: string, client: Client) => {
+    let { voiceConnections } = client.data;
     voiceConnections.set(guildId, connection);
     connection.receiver.speaking.on('start', async (userId) => {
         const receiveStream = connection.receiver.subscribe(userId, {
             end: { behavior: EndBehaviorType.Manual },
         });
-
+        const elapsed = Date.now() - start;
         const oggStream = new prism.opus.OggLogicalBitstream({
             opusHead: new prism.opus.OpusHead({
                 channelCount: 2,
@@ -42,22 +34,18 @@ const runReceiveLoop = async (guildId: string, connection: VoiceConnection, clie
             },
         });
 
-        const fileName = path.join(appConfig.workingDirectoryPathBase, `${Date.now()}-${getDisplayName(userId, client.users.cache.get(userId))}.opus`);
+        const user = await client.users.fetch(userId);
+        const fileName = path.join(dir, `${user.username}.${elapsed}.opus`);
         const file = fs.createWriteStream(fileName);
         try {
             await stream.pipeline(receiveStream, oggStream, file);
-            console.log(`✅ Recorded ${fileName}`);
         } catch (err) {
             console.warn(`❌ Error recording file ${fileName} - ${err}`);
         }
     });
 
-    // TODO: ...actually I don't know what to do, but it MIGHT not be this?
     connection.receiver.speaking.on('end', userId => {
-        const receiveStream = connection.receiver.subscriptions.get(userId);
-        if (receiveStream) {
-            receiveStream.push(null);
-        }
+        connection.receiver.subscriptions.get(userId)?.push(null);
     });
 }
 
@@ -87,11 +75,13 @@ const execute = async (interaction: RepliableInteraction) => {
             debug: true,
             adapterCreator: interaction.guild.voiceAdapterCreator,
         });
-
-        await interaction.reply(`Joined <#${channel.id}>`);
     }
 
-    runReceiveLoop(interaction.guildId, connection, interaction.client);
+    const start = Date.now();
+    const dir = path.join(interaction.client.data.appConfig.workingDirectoryPathBase, `${start}`);
+    fs.mkdirSync(dir);
+    await interaction.reply(`Joined <#${connection.joinConfig.channelId}>. Magic number: ${'`'}${start}${'`'}`);
+    runReceiveLoop(interaction.guildId, connection, start, dir, interaction.client);
 }
 
 export default <ConventionalCommand>{ data, execute };
