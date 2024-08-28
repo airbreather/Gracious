@@ -1,6 +1,7 @@
 import type { RepliableInteraction, SlashCommandBuilder } from "discord.js";
 
 import join from "./join";
+import leave from "./leave";
 
 export interface ConventionalCommand {
     data: SlashCommandBuilder,
@@ -8,5 +9,5 @@ export interface ConventionalCommand {
 }
 
 export const allCommands: Record<string, ConventionalCommand> = {
-    join,
+    join, leave
 };

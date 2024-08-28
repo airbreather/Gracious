@@ -3,7 +3,7 @@ import * as stream from 'node:stream/promises';
 import * as path from 'path';
 import * as prism from 'prism-media';
 
-import { ChannelType, Client, GuildMember, SlashCommandBuilder, type RepliableInteraction } from 'discord.js';
+import { channelMention, ChannelType, Client, GuildMember, SlashCommandBuilder, type RepliableInteraction, type VoiceBasedChannel } from 'discord.js';
 import { EndBehaviorType, getVoiceConnection, joinVoiceChannel, VoiceConnection } from '@discordjs/voice';
 
 import type { ConventionalCommand } from '.';
@@ -16,9 +16,7 @@ const data = new SlashCommandBuilder()
         .setDescription('What channel to join, or leave it blank for me to join your current one.')
         .addChannelTypes(ChannelType.GuildVoice));
 
-const runReceiveLoop = async (guildId: string, connection: VoiceConnection, start: number, dir: string, client: Client) => {
-    let { voiceConnections } = client.data;
-    voiceConnections.set(guildId, connection);
+const runReceiveLoop = async (connection: VoiceConnection, start: number, dir: string, client: Client) => {
     connection.receiver.speaking.on('start', async (userId) => {
         const receiveStream = connection.receiver.subscribe(userId, {
             end: { behavior: EndBehaviorType.Manual },
@@ -55,20 +53,27 @@ const execute = async (interaction: RepliableInteraction) => {
         return;
     }
 
-    let connection = interaction.guildId && getVoiceConnection(interaction.guildId);
-    if (!connection) {
-        let channel = interaction.options.getChannel('channel');
-        if (!channel && interaction.member instanceof GuildMember) {
-            channel = interaction.member.voice.channel;
-        }
+    if (interaction.member?.user.id !== interaction.client.application.owner?.id) {
+        await interaction.reply('For the time being, only the owner is allowed to use this bot. The rest of the code hasn\'t been written yet.');
+        return;
+    }
 
-        if (!channel) {
-            await interaction.reply('Channel can only be blank if you\'re already in a channel. Otherwise, I don\'t know where to go!');
-            return;
-        }
+    let targetChannel = interaction.options.getChannel('channel');
+    if (!targetChannel && interaction.member instanceof GuildMember) {
+        targetChannel = interaction.member.voice.channel;
+    }
 
+    if (!targetChannel) {
+        await interaction.reply('Channel can only be blank if you\'re already in a channel. Otherwise, how am I supposed to know where to go?');
+        return;
+    }
+
+    let connection = getVoiceConnection(interaction.guildId);
+    let currentChannel = connection && (await interaction.guild.voiceStates.fetch('@me')).channel;
+
+    if (!connection || currentChannel?.id !== targetChannel.id) {
         connection = joinVoiceChannel({
-            channelId: channel.id,
+            channelId: targetChannel.id,
             guildId: interaction.guild.id,
             selfDeaf: false,
             selfMute: false,
@@ -80,8 +85,13 @@ const execute = async (interaction: RepliableInteraction) => {
     const start = Date.now();
     const dir = path.join(interaction.client.data.appConfig.workingDirectoryPathBase, `${start}`);
     fs.mkdirSync(dir);
-    await interaction.reply(`Joined <#${connection.joinConfig.channelId}>. Magic number: ${'`'}${start}${'`'}`);
-    runReceiveLoop(interaction.guildId, connection, start, dir, interaction.client);
+    if (targetChannel) {
+        await interaction.reply(`Started recording in channel ${channelMention(targetChannel.id)}. Magic number: ${'`'}${start}${'`'}`);
+    } else {
+        await interaction.reply(`Started recording. Magic number: ${'`'}${start}${'`'}`);
+    }
+
+    runReceiveLoop(connection, start, dir, interaction.client);
 }
 
 export default <ConventionalCommand>{ data, execute };

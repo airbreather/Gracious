@@ -2,7 +2,7 @@ import * as os from 'os';
 import * as path from 'path';
 import * as yaml from 'yaml';
 
-import { Client, Collection, Events, GatewayIntentBits } from 'discord.js';
+import { Client, Collection, Events, GatewayIntentBits, User } from 'discord.js';
 import type { VoiceConnection } from '@discordjs/voice';
 
 import { allCommands, type ConventionalCommand } from './commands';
@@ -48,7 +48,14 @@ for (const [k, v] of Object.entries(allCommands)) {
     client.data.commands.set(k, v);
 }
 
-client.once(Events.ClientReady, readyClient => {
+client.once(Events.ClientReady, async readyClient => {
+    const app = await readyClient.application.fetch();
+    if (app.owner instanceof User) {
+        console.info(`Owner: ${app.owner.username}`);
+    } else {
+        console.warn(`No owner detected! Nobody will be able to actually use the bot! ${readyClient.application.owner}`);
+    }
+
     console.log(`Ready! Logged in as ${readyClient.user.tag}`);
 });
 
