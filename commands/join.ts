@@ -20,6 +20,7 @@ const runReceiveLoop = async (connection: VoiceConnection, start: number, dir: s
     connection.receiver.speaking.on('start', async (userId) => {
         const receiveStream = connection.receiver.subscribe(userId, {
             end: { behavior: EndBehaviorType.Manual },
+            highWaterMark: 1 << 20, // allocate a generous 1 MiB buffer in case user fetch is slow.
         });
         const elapsed = Date.now() - start;
         const oggStream = new prism.opus.OggLogicalBitstream({
