@@ -8,10 +8,8 @@ import type { AudioReceiveStream } from '@discordjs/voice';
 import { allCommands, type ConventionalCommand } from './commands';
 import deployCommands from './deploy-commands';
 
-type SingleStringProperty = Readonly<{ [key: string]: string } & Record<string, never>>;
-type FfmpegArg = string | SingleStringProperty;
-
-interface FfmpegArgs {
+export type FfmpegArg = string | Readonly<Record<string, string>>;
+export interface FfmpegArgs {
     desktopAudioInputs: Readonly<Record<string, ReadonlyArray<FfmpegArg>>>;
     realtimeAudioEncode: ReadonlyArray<FfmpegArg>;
     offlineAudioEncode: ReadonlyArray<FfmpegArg>;
@@ -24,8 +22,9 @@ export interface AppConfig {
     botToken: string;
     workingDirectoryPathBase: string;
     musicDirectoryPath: string;
+    recordScreenExe: string;
     guildIdsForApplicationCommands: ReadonlyArray<string>;
-    usernameTitleMappings: ({ [key: string]: string } & Record<string, never>)[];
+    usernameTitleMappings: ReadonlyArray<Readonly<Record<string, string>>>;
     ffmpegArgs: FfmpegArgs;
 }
 

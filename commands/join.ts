@@ -26,7 +26,6 @@ const runReceiveLoop = async (connection: VoiceConnection, start: number, dir: s
             end: { behavior: EndBehaviorType.Manual },
             highWaterMark: 1 << 20, // allocate a generous 1 MiB buffer in case user fetch is slow.
         });
-        let toPush = { receiveStream, flushed: null! as Promise<void> };
         const flushed = new Promise<void>(async (resolve, reject) => {
             try {
                 const elapsed = Date.now() - start;
@@ -49,7 +48,7 @@ const runReceiveLoop = async (connection: VoiceConnection, start: number, dir: s
                     console.warn(`❌ Error recording file ${fileName} - ${err}`);
                 }
 
-                const idx = client.data.activeStreams.indexOf(toPush);
+                const idx = client.data.activeStreams.findIndex(a => a.receiveStream === receiveStream);
                 if (idx > -1) {
                     client.data.activeStreams.splice(idx, 1);
                 }
@@ -59,9 +58,7 @@ const runReceiveLoop = async (connection: VoiceConnection, start: number, dir: s
                 reject(err);
             }
         });
-
-        toPush.flushed = flushed;
-        client.data.activeStreams.push(toPush);
+        client.data.activeStreams.push({ receiveStream, flushed });
     });
 
     connection.receiver.speaking.on('end', userId => {
