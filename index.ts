@@ -34,11 +34,21 @@ await deployCommands(appConfig);
 
 const client = new Client({ intents: [GatewayIntentBits.GuildVoiceStates, GatewayIntentBits.Guilds] });
 
+export type GraciousStream = {
+    receiveStream: AudioReceiveStream,
+    flushed: Promise<void>,
+}
+
+export type GraciousRecordingSession = {
+    stopping: boolean,
+    terminateGracefully: () => Promise<void>,
+    activeStreams: GraciousStream[],
+};
+
 const data = {
     appConfig,
     commands: new Collection<string, ConventionalCommand>(),
-    stopping: false,
-    activeStreams: [] as { receiveStream: AudioReceiveStream, flushed: Promise<void> }[],
+    sessions: new Map<string, GraciousRecordingSession>(),
 };
 
 declare module 'discord.js' { interface Client { data: typeof data; } };
