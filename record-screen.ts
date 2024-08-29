@@ -10,7 +10,7 @@ const spawn = <Opts extends SpawnOptions.OptionsObject>(args: string[], options?
 
 const unwrap = async <T extends Subprocess>(subprocess: { args: string[], proc: T }) => {
     const exitCode = await subprocess.proc.exited;
-    if (exitCode !== 0) {
+    if (exitCode !== 0 && exitCode !== 130) {
         throw new Error(`Process exited with code ${exitCode}. Original args:\n${subprocess.args}`);
     }
 }
@@ -43,7 +43,7 @@ const ffmpegSingleInputSingleOutput = ({ inputArgs, input, outputArgs, output }:
 export const run = async (appConfig: AppConfig, workingDirectoryPath: string) => {
     const fifoPath = path.join(workingDirectoryPath, 'tmp.fifo');
     const screenPath = path.join(workingDirectoryPath, 'screenOnly.mkv');
-    const screenRecordProc = spawn(['cargo', 'run', fifoPath], { cwd: appConfig.recordScreenExe, env: { ...process.env, "RUST_BACKTRACE": "full" } });
+    const screenRecordProc = spawn([appConfig.recordScreenExe, fifoPath], { env: { ...process.env, "RUST_BACKTRACE": "full" } });
     await new Promise<void>(resolve => {
         const interval = setInterval(() => {
             if (fs.existsSync(fifoPath)) {
