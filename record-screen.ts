@@ -66,7 +66,7 @@ export const run = async (appConfig: AppConfig, workingDirectoryPath: string) =>
             '-y',
             { '-use_wallclock_as_timestamps': '1' },
             { '-pix_fmt': 'bgra' },
-            { '-s': '2560x1440' },
+            { '-s': '2560x1368' },
             { '-f': 'rawvideo' },
         ],
         input: fifoPath,
@@ -88,7 +88,6 @@ export const run = async (appConfig: AppConfig, workingDirectoryPath: string) =>
 
     return async () => {
         screenRecordProc.proc.kill('SIGINT');
-        procs.splice(procs.indexOf(screenRecordProc), 1);
         for (const audioProc of ffmpegAudio) {
             audioProc.proc.stdin.write('q');
         }

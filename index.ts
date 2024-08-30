@@ -10,8 +10,10 @@ import deployCommands from './deploy-commands';
 import * as recordScreen from './record-screen';
 
 process.on('exit', () => {
-    for (const { abort } of recordScreen.procs) {
-        abort.abort();
+    for (const { proc, abort } of recordScreen.procs) {
+        if (proc.exitCode != null) {
+            abort.abort();
+        }
     }
 })
 
