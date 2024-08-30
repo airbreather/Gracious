@@ -49,7 +49,7 @@ const runReceiveLoop = async (guildId: string, connection: VoiceConnection, clie
         const fileName = path.join(client.appConfig.workingDirectoryPathBase, `${Date.now()}-${getDisplayName(userId, client.users.cache.get(userId))}.opus`);
         const file = fs.createWriteStream(fileName);
         try {
-            await stream.pipeline(receiveStream as any, oggStream as any, file as any);
+            await stream.pipeline(receiveStream, oggStream, file);
             console.log(`✅ Recorded ${fileName}`);
         } catch (err) {
             console.warn(`❌ Error recording file ${fileName} - ${err}`);
