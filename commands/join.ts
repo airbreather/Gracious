@@ -9,6 +9,7 @@ import { createAudioPlayer, EndBehaviorType, getVoiceConnection, joinVoiceChanne
 import type { ConventionalCommand } from '.';
 import * as recordScreen from '../record-screen';
 import type { GraciousStream } from '..';
+import { playTrack } from '../play-track';
 
 const data = new SlashCommandBuilder()
     .setName('join')
@@ -94,6 +95,17 @@ const runReceiveLoop = async (guildId: string, connection: VoiceConnection, star
             await Promise.all([(await screenRecording)(), ...session.activeStreams.map(s => s.flushed)]);
         },
     });
+
+    await playTrack(
+        player,
+        connection,
+        dir,
+        start,
+        'now-recording',
+        client.data.playableTracks,
+        () => Promise.resolve(),
+        () => Promise.resolve(),
+    );
 }
 
 const execute = async (interaction: RepliableInteraction) => {
