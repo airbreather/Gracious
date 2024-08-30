@@ -1,14 +1,20 @@
-import path from "path";
-import * as fs from "fs";
-import type { SpawnOptions, Subprocess } from "bun";
+import path from 'path';
+import * as fs from 'fs';
+import type { SpawnOptions, Subprocess } from 'bun';
 
-import type { AppConfig, FfmpegArg } from ".";
+import type { AppConfig, FfmpegArg } from '.';
+
+export const procs = [] as { args: ReadonlyArray<string>, proc: Subprocess, abort: AbortController }[];
 
 const spawn = <Opts extends SpawnOptions.OptionsObject>(args: string[], options?: Opts) => {
-    return { args, proc: Bun.spawn(args, options) };
+    const proc = Bun.spawn(args, options);
+    const abort = new AbortController();
+    const entry = { args, proc, abort };
+    procs.push(entry);
+    return entry;
 }
 
-const unwrap = async <T extends Subprocess>(subprocess: { args: string[], proc: T }) => {
+const unwrap = async <T extends Subprocess>(subprocess: { args: ReadonlyArray<string>, proc: T }) => {
     const exitCode = await subprocess.proc.exited;
     if (exitCode !== 0 && exitCode !== 130) {
         throw new Error(`Process exited with code ${exitCode}. Original args:\n${subprocess.args}`);
@@ -28,7 +34,7 @@ const ffmpeg = (args: ReadonlyArray<FfmpegArg>) => {
         }
     }
 
-    return spawn(_args, { stdin: "pipe" });
+    return spawn(_args, { stdin: 'pipe' });
 }
 
 const ffmpegSingleInputSingleOutput = ({ inputArgs, input, outputArgs, output }: { inputArgs: ReadonlyArray<FfmpegArg>, input: string, outputArgs: ReadonlyArray<FfmpegArg>, output: string }) => {
@@ -43,7 +49,9 @@ const ffmpegSingleInputSingleOutput = ({ inputArgs, input, outputArgs, output }:
 export const run = async (appConfig: AppConfig, workingDirectoryPath: string) => {
     const fifoPath = path.join(workingDirectoryPath, 'tmp.fifo');
     const screenPath = path.join(workingDirectoryPath, 'screenOnly.mkv');
-    const screenRecordProc = spawn([appConfig.recordScreenExe, fifoPath], { env: { ...process.env, "RUST_BACKTRACE": "full" } });
+    const screenRecordProc = spawn([appConfig.recordScreenExe, fifoPath], { env: { ...process.env, 'RUST_BACKTRACE': 'full' } });
+    screenRecordProc.abort.signal.addEventListener('abort', () => screenRecordProc.proc.kill('SIGTERM'));
+
     await new Promise<void>(resolve => {
         const interval = setInterval(() => {
             if (fs.existsSync(fifoPath)) {
@@ -65,21 +73,24 @@ export const run = async (appConfig: AppConfig, workingDirectoryPath: string) =>
         outputArgs: appConfig.ffmpegArgs.realtimeVideoEncode,
         output: screenPath,
     });
-    const ffmpegAudio = [] as { args: string[], proc: Subprocess<"pipe", "pipe", "inherit">}[];
+    const ffmpegAudio = [] as { args: ReadonlyArray<string>, abort: AbortController, proc: Subprocess<'pipe', 'pipe', 'inherit'> }[];
     const desktopAudioInputs = appConfig.ffmpegArgs.desktopAudioInputs;
     for (const inputKey of Object.keys(desktopAudioInputs)) {
-        ffmpegAudio.push(ffmpegSingleInputSingleOutput({
+        const ffmpegAudioProc = ffmpegSingleInputSingleOutput({
             inputArgs: ['-y', ...desktopAudioInputs[inputKey]],
             input: inputKey,
             outputArgs: appConfig.ffmpegArgs.realtimeAudioEncode,
             output: path.join(workingDirectoryPath, `audio_${ffmpegAudio.length}.flac`),
-        }));
+        });
+        ffmpegAudioProc.abort.signal.addEventListener('abort', () => ffmpegAudioProc.proc.kill('SIGTERM'));
+        ffmpegAudio.push(ffmpegAudioProc);
     }
 
     return async () => {
-        screenRecordProc.proc.kill("SIGINT");
+        screenRecordProc.proc.kill('SIGINT');
+        procs.splice(procs.indexOf(screenRecordProc), 1);
         for (const audioProc of ffmpegAudio) {
-            audioProc.proc.stdin.write("q");
+            audioProc.proc.stdin.write('q');
         }
 
         await Promise.all([unwrap(screenRecordProc), unwrap(ffmpegScreen), ...ffmpegAudio.map(unwrap)]);

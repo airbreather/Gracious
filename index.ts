@@ -3,10 +3,17 @@ import * as path from 'path';
 import * as yaml from 'yaml';
 
 import { Client, Collection, Events, GatewayIntentBits, User } from 'discord.js';
-import type { AudioReceiveStream } from '@discordjs/voice';
+import type { AudioPlayer, AudioReceiveStream, VoiceConnection } from '@discordjs/voice';
 
 import { allCommands, type ConventionalCommand } from './commands';
 import deployCommands from './deploy-commands';
+import * as recordScreen from './record-screen';
+
+process.on('exit', () => {
+    for (const { abort } of recordScreen.procs) {
+        abort.abort();
+    }
+})
 
 export type FfmpegArg = string | Readonly<Record<string, string>>;
 export interface FfmpegArgs {
@@ -30,6 +37,15 @@ export interface AppConfig {
 
 const appConfig: AppConfig = yaml.parse(await Bun.file(path.join(os.homedir(), 'secret-discord-config.yml')).text());
 
+const playableTracks = new Collection<string, { name: string, fullPath: string }>();
+const trackIndex = await Bun.file(path.join(appConfig.musicDirectoryPath, 'index.txt')).text();
+for (const track of trackIndex.split(/\r?\n/)) {
+    const [trackName, trackPath] = track.split('|', 2);
+    if (trackPath) {
+        playableTracks.set(trackName, { name: trackPath, fullPath: path.join(appConfig.musicDirectoryPath, trackPath) });
+    }
+}
+
 await deployCommands(appConfig);
 
 const client = new Client({ intents: [GatewayIntentBits.GuildVoiceStates, GatewayIntentBits.Guilds] });
@@ -41,14 +57,19 @@ export type GraciousStream = {
 
 export type GraciousRecordingSession = {
     stopping: boolean,
-    terminateGracefully: () => Promise<void>,
-    activeStreams: GraciousStream[],
+    readonly start: number,
+    readonly dir: string,
+    readonly terminateGracefully: () => Promise<void>,
+    readonly activeStreams: GraciousStream[],
+    readonly connection: VoiceConnection,
+    readonly player: AudioPlayer,
 };
 
 const data = {
     appConfig,
+    playableTracks,
     commands: new Collection<string, ConventionalCommand>(),
-    sessions: new Map<string, GraciousRecordingSession>(),
+    sessions: new Collection<string, GraciousRecordingSession>(),
 };
 
 declare module 'discord.js' { interface Client { data: typeof data; } };

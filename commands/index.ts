@@ -1,7 +1,8 @@
-import type { RepliableInteraction, SlashCommandBuilder } from "discord.js";
+import type { RepliableInteraction, SlashCommandBuilder } from 'discord.js';
 
-import join from "./join";
-import leave from "./leave";
+import join from './join';
+import leave from './leave';
+import play from './play';
 
 export interface ConventionalCommand {
     data: SlashCommandBuilder,
@@ -9,5 +10,5 @@ export interface ConventionalCommand {
 }
 
 export const allCommands: Record<string, ConventionalCommand> = {
-    join, leave
+    join, leave, play,
 };

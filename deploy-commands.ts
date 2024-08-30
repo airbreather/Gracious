@@ -1,6 +1,6 @@
-import { REST, Routes } from "discord.js";
+import { REST, Routes } from 'discord.js';
 
-import type { AppConfig } from ".";
+import type { AppConfig } from '.';
 import { allCommands } from './commands';
 
 const body = Object.values(allCommands).map(c => c.data.toJSON());

@@ -4,7 +4,7 @@ import * as path from 'path';
 import * as prism from 'prism-media';
 
 import { channelMention, ChannelType, Client, GuildMember, SlashCommandBuilder, type RepliableInteraction } from 'discord.js';
-import { EndBehaviorType, getVoiceConnection, joinVoiceChannel, VoiceConnection } from '@discordjs/voice';
+import { createAudioPlayer, EndBehaviorType, getVoiceConnection, joinVoiceChannel, VoiceConnection } from '@discordjs/voice';
 
 import type { ConventionalCommand } from '.';
 import * as recordScreen from '../record-screen';
@@ -69,9 +69,15 @@ const runReceiveLoop = async (guildId: string, connection: VoiceConnection, star
         connection.receiver.subscriptions.get(userId)?.push(null);
     });
 
+    const player = createAudioPlayer();
+    connection.subscribe(player);
     client.data.sessions.set(guildId, {
         activeStreams,
         stopping: false,
+        connection,
+        player,
+        start,
+        dir,
         terminateGracefully: async () => {
             const session = client.data.sessions.get(guildId);
             if (!session) {
