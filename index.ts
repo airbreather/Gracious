@@ -7,17 +7,8 @@ import type { AudioPlayer, AudioReceiveStream, VoiceConnection } from '@discordj
 
 import { allCommands, type ConventionalCommand } from './commands';
 import deployCommands from './deploy-commands';
-import * as recordScreen from './record-screen';
 
-process.on('exit', () => {
-    for (const { proc, abort } of recordScreen.procs) {
-        if (proc.exitCode != null) {
-            abort.abort();
-        }
-    }
-});
-
-export interface AppConfig {
+interface AppConfigData {
     applicationId: string;
     botToken: string;
     workingDirectoryPathBase: string;
@@ -25,8 +16,10 @@ export interface AppConfig {
     recordScreenExe: string;
     guildIdsForApplicationCommands: ReadonlyArray<string>;
     usernameTitleMappings: ReadonlyArray<Readonly<Record<string, string>>>;
-    ffmpegPulseAudioInputs: ReadonlyArray<string>;
+    ffmpegPulseAudioInput: string;
 }
+
+export type AppConfig = Readonly<AppConfigData>;
 
 const appConfig: AppConfig = yaml.parse(await Bun.file(path.join(os.homedir(), 'secret-discord-config.yml')).text());
 
