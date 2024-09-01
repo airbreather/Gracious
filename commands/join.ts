@@ -1,7 +1,7 @@
-import * as fs from 'node:fs';
-import * as stream from 'node:stream/promises';
+import * as fs from 'fs';
 import * as path from 'path';
 import * as prism from 'prism-media';
+import * as stream from 'stream/promises';
 
 import { channelMention, ChannelType, Client, GuildMember, SlashCommandBuilder, type RepliableInteraction } from 'discord.js';
 import { createAudioPlayer, EndBehaviorType, getVoiceConnection, joinVoiceChannel, VoiceConnection } from '@discordjs/voice';

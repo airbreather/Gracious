@@ -1,5 +1,5 @@
-import * as path from 'path';
 import * as fsp from 'fs/promises';
+import * as path from 'path';
 
 import type { Collection } from "discord.js";
 import { AudioPlayerError, AudioPlayerStatus, createAudioResource, PlayerSubscription, VoiceConnection, type AudioPlayer, type AudioPlayerState } from "@discordjs/voice";
@@ -28,9 +28,6 @@ export const playTrack = async (
     if (player.state.status !== AudioPlayerStatus.Idle) {
         return Result.AlreadyPlayingSomethingElse;
     }
-
-    const targetPath = path.join(dir, 'track.' + (Date.now() - start) + '.' + trackInfo.name);
-    await fsp.copyFile(trackInfo.fullPath, targetPath);
 
     let subscription: PlayerSubscription | null = null;
     let ignorePendingErrorCallback = false;
@@ -70,13 +67,17 @@ export const playTrack = async (
     };
     player.on('stateChange', stateChangeCallback);
 
+    const ts = Date.now() - start;
+    const targetPath = path.join(dir, 'track.' + ts + '.' + trackInfo.name);
+    const copyPromise = fsp.copyFile(trackInfo.fullPath, targetPath);
     subscription = connection.subscribe(player) ?? null;
     try {
-        player.play(createAudioResource(targetPath));
+        player.play(createAudioResource(trackInfo.fullPath));
     } catch (err) {
         subscription?.unsubscribe();
         throw err;
     }
 
+    await copyPromise;
     return Result.Success;
 }
