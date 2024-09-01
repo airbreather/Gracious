@@ -1,8 +1,9 @@
-import path from 'path';
+import * as path from 'path';
 import * as fs from 'fs';
+
 import type { SpawnOptions, Subprocess } from 'bun';
 
-import type { AppConfig, FfmpegArg } from '.';
+import type { AppConfig } from '.';
 
 export const procs = [] as { args: ReadonlyArray<string>, proc: Subprocess, abort: AbortController }[];
 
@@ -21,34 +22,21 @@ const unwrap = async <T extends Subprocess>(subprocess: { args: ReadonlyArray<st
     }
 }
 
-const ffmpeg = (args: ReadonlyArray<FfmpegArg>) => {
-    const _args = ['ffmpeg'];
-    for (const arg of args) {
-        if (typeof arg === 'string') {
-            _args.push(arg);
-        } else {
-            for (const k of Object.keys(arg)) {
-                _args.push(k);
-                _args.push(arg[k]);
-            }
-        }
-    }
-
-    return spawn(_args, { stdin: 'pipe' });
+const ffmpeg = (args: ReadonlyArray<string>) => {
+    return spawn(['ffmpeg', ...args], { stdin: 'pipe' });
 }
 
-const ffmpegSingleInputSingleOutput = ({ inputArgs, input, outputArgs, output }: { inputArgs: ReadonlyArray<FfmpegArg>, input: string, outputArgs: ReadonlyArray<FfmpegArg>, output: string }) => {
+const ffmpegSingleInputSingleOutput = ({ inputArgs, input, outputArgs, output }: { inputArgs: ReadonlyArray<string>, input: string, outputArgs: ReadonlyArray<string>, output: string }) => {
     return ffmpeg([
         ...inputArgs,
-        { '-i': input },
+        '-i', input,
         ...outputArgs,
         output,
     ]);
 }
 
-export const run = async (appConfig: AppConfig, workingDirectoryPath: string) => {
+export const run = async (appConfig: AppConfig, start: number, workingDirectoryPath: string) => {
     const fifoPath = path.join(workingDirectoryPath, 'tmp.fifo');
-    const screenPath = path.join(workingDirectoryPath, 'screenOnly.mkv');
     const screenRecordProc = spawn([appConfig.recordScreenExe, fifoPath], { env: { ...process.env, 'RUST_BACKTRACE': 'full' } });
     screenRecordProc.abort.signal.addEventListener('abort', () => screenRecordProc.proc.kill('SIGTERM'));
 
@@ -61,25 +49,40 @@ export const run = async (appConfig: AppConfig, workingDirectoryPath: string) =>
         }, 100);
     })
 
+    const screenPath = path.join(workingDirectoryPath, `screenOnly.${Date.now() - start}.mkv`);
     const ffmpegScreen = ffmpegSingleInputSingleOutput({
         inputArgs: [
             '-y',
-            { '-use_wallclock_as_timestamps': '1' },
-            { '-pix_fmt': 'bgra' },
-            { '-s': '2560x1368' },
-            { '-f': 'rawvideo' },
+            '-use_wallclock_as_timestamps', '1',
+            '-pix_fmt', 'bgra',
+            '-s', '2560x1368',
+            '-f', 'rawvideo',
         ],
         input: fifoPath,
-        outputArgs: appConfig.ffmpegArgs.realtimeVideoEncode,
+        outputArgs: [
+            '-c', 'libx264rgb',
+            '-crf', '0',
+            '-filter', 'fps=60',
+            '-preset', 'ultrafast',
+            '-tune', 'zerolatency',
+        ],
         output: screenPath,
     });
     const ffmpegAudio = [] as { args: ReadonlyArray<string>, abort: AbortController, proc: Subprocess<'pipe', 'pipe', 'inherit'> }[];
-    const desktopAudioInputs = appConfig.ffmpegArgs.desktopAudioInputs;
-    for (const inputKey of Object.keys(desktopAudioInputs)) {
+    for (const inputKey of appConfig.ffmpegPulseAudioInputs) {
         const ffmpegAudioProc = ffmpegSingleInputSingleOutput({
-            inputArgs: ['-y', ...desktopAudioInputs[inputKey]],
+            inputArgs: ['-y',
+                '-use_wallclock_as_timestamps', '1',
+                '-f', 'pulse',
+                '-ar', '48000',
+                '-ac', '2',
+                '-thread_queue_size', '4096',
+                '-threads', '0',
+            ],
             input: inputKey,
-            outputArgs: appConfig.ffmpegArgs.realtimeAudioEncode,
+            outputArgs: [
+                '-c', 'flac',
+            ],
             output: path.join(workingDirectoryPath, `audio_${ffmpegAudio.length}.flac`),
         });
         ffmpegAudioProc.abort.signal.addEventListener('abort', () => ffmpegAudioProc.proc.kill('SIGTERM'));

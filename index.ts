@@ -15,16 +15,7 @@ process.on('exit', () => {
             abort.abort();
         }
     }
-})
-
-export type FfmpegArg = string | Readonly<Record<string, string>>;
-export interface FfmpegArgs {
-    desktopAudioInputs: Readonly<Record<string, ReadonlyArray<FfmpegArg>>>;
-    realtimeAudioEncode: ReadonlyArray<FfmpegArg>;
-    offlineAudioEncode: ReadonlyArray<FfmpegArg>;
-    realtimeVideoEncode: ReadonlyArray<FfmpegArg>;
-    offlineVideoEncode: ReadonlyArray<FfmpegArg>;
-}
+});
 
 export interface AppConfig {
     applicationId: string;
@@ -34,7 +25,7 @@ export interface AppConfig {
     recordScreenExe: string;
     guildIdsForApplicationCommands: ReadonlyArray<string>;
     usernameTitleMappings: ReadonlyArray<Readonly<Record<string, string>>>;
-    ffmpegArgs: FfmpegArgs;
+    ffmpegPulseAudioInputs: ReadonlyArray<string>;
 }
 
 const appConfig: AppConfig = yaml.parse(await Bun.file(path.join(os.homedir(), 'secret-discord-config.yml')).text());

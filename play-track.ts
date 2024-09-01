@@ -1,5 +1,5 @@
 import * as path from 'path';
-import { copyFile } from 'fs/promises';
+import * as fsp from 'fs/promises';
 
 import type { Collection } from "discord.js";
 import { AudioPlayerError, AudioPlayerStatus, createAudioResource, PlayerSubscription, VoiceConnection, type AudioPlayer, type AudioPlayerState } from "@discordjs/voice";
@@ -30,7 +30,7 @@ export const playTrack = async (
     }
 
     const targetPath = path.join(dir, 'track.' + (Date.now() - start) + '.' + trackInfo.name);
-    await copyFile(trackInfo.fullPath, targetPath);
+    await fsp.copyFile(trackInfo.fullPath, targetPath);
 
     let subscription: PlayerSubscription | null = null;
     let ignorePendingErrorCallback = false;

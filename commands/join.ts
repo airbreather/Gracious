@@ -21,7 +21,7 @@ const data = new SlashCommandBuilder()
 
 const runReceiveLoop = async (guildId: string, connection: VoiceConnection, start: number, dir: string, client: Client) => {
     const activeStreams: GraciousStream[] = [];
-    const screenRecording = recordScreen.run(client.data.appConfig, dir);
+    const screenRecording = recordScreen.run(client.data.appConfig, start, dir);
     connection.receiver.speaking.on('start', async (userId) => {
         if (client.data.sessions.get(guildId)?.stopping === true) {
             return;
