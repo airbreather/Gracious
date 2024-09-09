@@ -43,7 +43,6 @@ export type GraciousStream = {
 
 export type GraciousRecordingSession = {
     stopping: boolean,
-    readonly start: number,
     readonly dir: string,
     readonly terminateGracefully: () => Promise<void>,
     readonly activeStreams: GraciousStream[],

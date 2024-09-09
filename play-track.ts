@@ -14,7 +14,6 @@ export const playTrack = async (
     player: AudioPlayer,
     connection: VoiceConnection,
     dir: string,
-    start: number,
     trackFile: string,
     playableTracks: Collection<string, { name: string, fullPath: string }>,
     begin: () => Promise<unknown>,
@@ -67,8 +66,7 @@ export const playTrack = async (
     };
     player.on('stateChange', stateChangeCallback);
 
-    const ts = Date.now() - start;
-    const targetPath = path.join(dir, 'track.' + ts + '.' + trackInfo.name);
+    const targetPath = path.join(dir, `track.${Date.now()}.${trackInfo.name}`);
     const copyPromise = fsp.copyFile(trackInfo.fullPath, targetPath);
     subscription = connection.subscribe(player) ?? null;
     try {

@@ -21,7 +21,7 @@ export const combineTracks = async (inputDirPath: string, username: string, outp
         }
     }
 
-    const silenceDirPath = path.join(outputDirPath, 'silence-samples');
+    const silenceDirPath = '/tmp/silence-samples';
     await fsp.mkdir(silenceDirPath, { recursive: true });
     const silenceMatcher = new RegExp(`^silence\\.(?<silenceDuration>\\d+)\\.opus$`);
     const silenceDurations = new Set<number>();
@@ -40,20 +40,33 @@ export const combineTracks = async (inputDirPath: string, username: string, outp
     }
 
     const silenceCommands = [] as Promise<number>[];
-    let prevTimestamp = 0;
-    for (const [timestamp, inputPath] of [...inputFiles.entries()].sort(([ts0, ], [ts1, ]) => ts0 - ts1)) {
-        // timestamp is the START of this clip, but our silence needs to start at the END of it.
+    let prevTimestamp = Number(path.basename(inputDirPath));
+    for (const [startTimestamp, inputPath] of [...inputFiles.entries()].sort(([ts0, ], [ts1, ]) => ts0 - ts1)) {
+        // timestamp is the START of this clip, but our silence needs to start at the END of it. in
+        // order for this to work, we need accurate duration calculations. for whatever reason, the
+        // calculations based on metadata seem to be off by a significant margin, which is a problem
+        // when accumulating a bunch of these individual files over a period of hours. so instead,
+        // fully decode each Opus file, count the bytes, and convert that to a count of PCM samples.
+        // almost by definition, this is as accurate as we can possibly get (which is to say that if
+        // I'm wrong and it's still not perfect in some way, at least it's wrong in a way that will
+        // transfer to the final stream and reset itself every time the next clip starts, since the
+        // clips are tagged with their absolute starting timestamps anyway).
         let pcmBytes = 0;
         try {
             pcmBytes = Number(await $`opusdec ${inputPath} - | wc -c`.text());
         } catch (err) {
-            // this has been observed with at least one clip that didn't get fully written.
+            // this was observed with one clip that didn't get fully written. exactly WHY it didn't
+            // get fully written is unknown, but again almost by definition, there's really nothing
+            // that can be done in these cases. it's also not CRITICAL to keep EVERY clip (the fully
+            // merged and pre-balanced desktop audio is the primary track), and as long as these are
+            // VERY RARE, then I really can't justify investigating any more than it takes to deduce
+            // that they are in fact VERY RARE (observed: 1/~4000 at the time of writing).
             continue;
         }
 
         const inputDuration = Number(pcmBytes * pcmBytesToMilliseconds);
 
-        const silenceDuration = timestamp - prevTimestamp;
+        const silenceDuration = startTimestamp - prevTimestamp;
         const silenceFilePath = path.join(silenceDirPath, `silence.${silenceDuration}.opus`);
         if (!silenceDurations.has(silenceDuration)) {
             silenceDurations.add(silenceDuration);
@@ -66,16 +79,11 @@ export const combineTracks = async (inputDirPath: string, username: string, outp
             ], { stdio: ['ignore', 'ignore', 'ignore'] }).exited);
         }
 
-        concatFile.write(`file '${silenceFilePath}'\n`);
-        concatFile.write(`duration ${(silenceDuration / 1000).toFixed(3)}\n`);
-        concatFile.write(`file '${inputPath}'\n`);
-        concatFile.write(`duration ${(inputDuration / 1000).toFixed(3)}\n`);
-
-        prevTimestamp = timestamp + inputDuration;
+        concatFile.write(`file '${silenceFilePath}'\nduration ${(silenceDuration / 1000).toFixed(3)}\nfile '${inputPath}'\nduration ${(inputDuration / 1000).toFixed(3)}\n`);
+        prevTimestamp = startTimestamp + inputDuration;
     }
 
-    await concatFile.end();
-    await Promise.all(silenceCommands);
+    await Promise.all([concatFile.end(), ...silenceCommands]);
 
     await Bun.spawn([
         'ffmpeg',
@@ -87,4 +95,6 @@ export const combineTracks = async (inputDirPath: string, username: string, outp
         '-c', 'copy',
         path.join(outputDirPath, `${username}.opus`),
     ], { stdio: ['ignore', 'ignore', 'ignore'] }).exited;
+
+    await fsp.rm(concatFilePath);
 };

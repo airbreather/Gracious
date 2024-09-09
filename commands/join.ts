@@ -19,9 +19,9 @@ const data = new SlashCommandBuilder()
         .setDescription('What channel to join, or leave it blank for me to join your current one.')
         .addChannelTypes(ChannelType.GuildVoice));
 
-const runReceiveLoop = async (guildId: string, connection: VoiceConnection, start: number, dir: string, client: Client) => {
+const runReceiveLoop = async (guildId: string, connection: VoiceConnection, dir: string, client: Client) => {
     const activeStreams: GraciousStream[] = [];
-    const screenRecording = recordScreen.run(client.data.appConfig, start, dir);
+    const screenRecording = recordScreen.run(client.data.appConfig, dir);
     connection.receiver.speaking.on('start', async (userId) => {
         if (client.data.sessions.get(guildId)?.stopping === true) {
             return;
@@ -33,7 +33,7 @@ const runReceiveLoop = async (guildId: string, connection: VoiceConnection, star
         });
         const flushed = new Promise<void>(async (resolve, reject) => {
             try {
-                const elapsed = Date.now() - start;
+                const recvTimestamp = Date.now();
                 const oggStream = new prism.opus.OggLogicalBitstream({
                     opusHead: new prism.opus.OpusHead({
                         channelCount: 2,
@@ -45,7 +45,7 @@ const runReceiveLoop = async (guildId: string, connection: VoiceConnection, star
                 });
 
                 const user = await client.users.fetch(userId);
-                const fileName = path.join(dir, `${user.tag}.${elapsed}.opus`);
+                const fileName = path.join(dir, `${user.tag}.${recvTimestamp}.opus`);
                 const file = fs.createWriteStream(fileName);
                 try {
                     await stream.pipeline(receiveStream, oggStream, file);
@@ -77,7 +77,6 @@ const runReceiveLoop = async (guildId: string, connection: VoiceConnection, star
         stopping: false,
         connection,
         player,
-        start,
         dir,
         terminateGracefully: async () => {
             const session = client.data.sessions.get(guildId);
@@ -100,7 +99,6 @@ const runReceiveLoop = async (guildId: string, connection: VoiceConnection, star
         player,
         connection,
         dir,
-        start,
         'now-recording',
         client.data.playableTracks,
         () => Promise.resolve(),
@@ -152,7 +150,7 @@ const execute = async (interaction: RepliableInteraction) => {
         await interaction.reply(`Started recording. Magic number: ${'`'}${start}${'`'}`);
     }
 
-    runReceiveLoop(interaction.guildId, connection, start, dir, interaction.client);
+    runReceiveLoop(interaction.guildId, connection, dir, interaction.client);
 }
 
 export default <ConventionalCommand>{ data, execute };

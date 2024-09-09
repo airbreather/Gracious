@@ -16,8 +16,8 @@ const ffmpegRedux = ({ inputArgs, input, outputArgs, output }: { inputArgs: Read
     ], { stdin: 'pipe' });
 }
 
-export const run = async (appConfig: AppConfig, start: number, workingDirectoryPath: string) => {
-    const screenRecordProc = Bun.spawn([appConfig.recordScreenExe, workingDirectoryPath, `${Date.now() - start}`], { env: { ...process.env, 'RUST_BACKTRACE': 'full' } });
+export const run = async (appConfig: AppConfig, workingDirectoryPath: string) => {
+    const screenRecordProc = Bun.spawn([appConfig.recordScreenExe, workingDirectoryPath], { env: { ...process.env, 'RUST_BACKTRACE': 'full' } });
     const ffmpegAudio = ffmpegRedux({
         inputArgs: ['-y',
             '-use_wallclock_as_timestamps', '1',
@@ -31,7 +31,7 @@ export const run = async (appConfig: AppConfig, start: number, workingDirectoryP
         outputArgs: [
             '-c', 'flac',
         ],
-        output: path.join(workingDirectoryPath, `audio.${Date.now() - start}.flac`),
+        output: path.join(workingDirectoryPath, `audio.${Date.now()}.flac`),
     });
 
     return async () => {
