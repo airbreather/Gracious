@@ -33,7 +33,6 @@ const execute = async (interaction: RepliableInteraction) => {
         session.player,
         session.connection,
         session.dir,
-        session.start,
         trackFile,
         interaction.client.data.playableTracks,
         () => interaction.reply(`Playing '${trackFile}' now...`),
