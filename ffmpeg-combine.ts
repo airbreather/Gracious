@@ -4,9 +4,24 @@ import { $ } from 'bun';
 
 import escapeStringRegexp from 'escape-string-regexp';
 
-const pcmBytesToMilliseconds = 1000 /* seconds per millisecond */ / ((48000 * 2) /* stereo samples per second */ * 2 /* bytes per sample */);
+// 1000 seconds per millisecond / ((48000 * 2) stereo samples per second * 2 bytes per sample)
+const pcmBytesToMilliseconds = 1000 / ((48000 * 2) * 2);
 
-export const combineTracks = async (inputDirPath: string, username: string, outputDirPath: string) => {
+// ((48000 * 2) stereo samples per second * 2 bytes per sample) / 1000 seconds per millisecond
+const millisecondsToPcmBytes = ((48000 * 2) * 2) / 1000;
+
+const getDurationOfOpusFile = async (inputPath: string) => {
+    let pcmBytes = 0;
+    try {
+        pcmBytes = Number(await $`opusdec ${inputPath} - | wc -c`.text());
+    } catch (err) {
+        return null;
+    }
+
+    return { pcmBytes, milliseconds: Number(pcmBytes * pcmBytesToMilliseconds) };
+}
+
+export const combineTracks = async (inputDirPath: string, username: string, outputDirPath: string, magic: string) => {
     const inputDir = await fsp.opendir(inputDirPath);
     const inputFiles = new Map<number, string>();
     const currentUserMatcher = new RegExp(`^${escapeStringRegexp(username)}\\.(?<startTimestamp>\\d+)\\.opus$`);
@@ -41,6 +56,7 @@ export const combineTracks = async (inputDirPath: string, username: string, outp
 
     const silenceCommands = [] as Promise<number>[];
     let prevTimestamp = Number(path.basename(inputDirPath));
+    const ranges = new Map<number, Record<'precedingSilence'|'inputDuration'|'endTimestamp', number>>();
     for (const [startTimestamp, inputPath] of [...inputFiles.entries()].sort(([ts0, ], [ts1, ]) => ts0 - ts1)) {
         // timestamp is the START of this clip, but our silence needs to start at the END of it. in
         // order for this to work, we need accurate duration calculations. for whatever reason, the
@@ -51,10 +67,8 @@ export const combineTracks = async (inputDirPath: string, username: string, outp
         // I'm wrong and it's still not perfect in some way, at least it's wrong in a way that will
         // transfer to the final stream and reset itself every time the next clip starts, since the
         // clips are tagged with their absolute starting timestamps anyway).
-        let pcmBytes = 0;
-        try {
-            pcmBytes = Number(await $`opusdec ${inputPath} - | wc -c`.text());
-        } catch (err) {
+        const inputDuration = await getDurationOfOpusFile(inputPath);
+        if (inputDuration === null) {
             // this was observed with one clip that didn't get fully written. exactly WHY it didn't
             // get fully written is unknown, but again almost by definition, there's really nothing
             // that can be done in these cases. it's also not CRITICAL to keep EVERY clip (the fully
@@ -64,11 +78,14 @@ export const combineTracks = async (inputDirPath: string, username: string, outp
             continue;
         }
 
-        const inputDuration = Number(pcmBytes * pcmBytesToMilliseconds);
-
         const silenceDuration = startTimestamp - prevTimestamp;
         const silenceFilePath = path.join(silenceDirPath, `silence.${silenceDuration}.opus`);
-        if (!silenceDurations.has(silenceDuration)) {
+        if (silenceDurations.has(silenceDuration)) {
+            const inferredSilenceDuration = await getDurationOfOpusFile(silenceFilePath);
+            if (!inferredSilenceDuration || inferredSilenceDuration.pcmBytes !== silenceDuration * millisecondsToPcmBytes) {
+                console.error(`oh no, silence file ${silenceDuration} does not look like what we need!!!`);
+            }
+        } else {
             silenceDurations.add(silenceDuration);
             silenceCommands.push(Bun.spawn([
                 'ffmpeg',
@@ -79,11 +96,14 @@ export const combineTracks = async (inputDirPath: string, username: string, outp
             ], { stdio: ['ignore', 'ignore', 'ignore'] }).exited);
         }
 
-        concatFile.write(`file '${silenceFilePath}'\nduration ${(silenceDuration / 1000).toFixed(3)}\nfile '${inputPath}'\nduration ${(inputDuration / 1000).toFixed(3)}\n`);
-        prevTimestamp = startTimestamp + inputDuration;
+        concatFile.write(`file '${silenceFilePath}'\nduration ${(silenceDuration / 1000).toFixed(3)}\nfile '${inputPath}'\nduration ${(inputDuration.milliseconds / 1000).toFixed(3)}\n`);
+        prevTimestamp = startTimestamp + inputDuration.milliseconds;
+        ranges.set(startTimestamp, { precedingSilence: silenceDuration, inputDuration: inputDuration.milliseconds, endTimestamp: startTimestamp + inputDuration.milliseconds });
     }
 
     await Promise.all([concatFile.end(), ...silenceCommands]);
+
+    await fsp.writeFile(path.join(outputDirPath, `${username}-segments.json`), JSON.stringify([...ranges.entries()].map(([k, v]) => ({ startTimestamp: k, ...v }))));
 
     await Bun.spawn([
         'ffmpeg',
@@ -95,6 +115,5 @@ export const combineTracks = async (inputDirPath: string, username: string, outp
         '-c', 'copy',
         path.join(outputDirPath, `${username}.opus`),
     ], { stdio: ['ignore', 'ignore', 'ignore'] }).exited;
-
     await fsp.rm(concatFilePath);
 };
