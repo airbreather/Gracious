@@ -21,7 +21,7 @@ const getDurationOfOpusFile = async (inputPath: string) => {
     return { pcmBytes, milliseconds: Number(pcmBytes * pcmBytesToMilliseconds) };
 }
 
-export const combineTracks = async (inputDirPath: string, username: string, outputDirPath: string, magic: string) => {
+export const combineTracks = async (inputDirPath: string, username: string, outputDirPath: string) => {
     const inputDir = await fsp.opendir(inputDirPath);
     const inputFiles = new Map<number, string>();
     const currentUserMatcher = new RegExp(`^${escapeStringRegexp(username)}\\.(?<startTimestamp>\\d+)\\.opus$`);
@@ -54,7 +54,6 @@ export const combineTracks = async (inputDirPath: string, username: string, outp
         }
     }
 
-    const silenceCommands = [] as Promise<number>[];
     let prevTimestamp = Number(path.basename(inputDirPath));
     const ranges = new Map<number, Record<'precedingSilence'|'inputDuration'|'endTimestamp', number>>();
     for (const [startTimestamp, inputPath] of [...inputFiles.entries()].sort(([ts0, ], [ts1, ]) => ts0 - ts1)) {
@@ -79,21 +78,32 @@ export const combineTracks = async (inputDirPath: string, username: string, outp
         }
 
         const silenceDuration = startTimestamp - prevTimestamp;
+        if (silenceDuration < 0) {
+            console.error('MANUAL EFFORT NEEDED:', startTimestamp, username);
+        }
+
         const silenceFilePath = path.join(silenceDirPath, `silence.${silenceDuration}.opus`);
-        if (silenceDurations.has(silenceDuration)) {
-            const inferredSilenceDuration = await getDurationOfOpusFile(silenceFilePath);
-            if (!inferredSilenceDuration || inferredSilenceDuration.pcmBytes !== silenceDuration * millisecondsToPcmBytes) {
-                console.error(`oh no, silence file ${silenceDuration} does not look like what we need!!!`);
+        const silenceFilePathTmp = path.join(silenceDirPath, `silence.${silenceDuration}.${username}-tmp.opus`);
+        while (true) {
+            if (silenceDurations.has(silenceDuration)) {
+                const inferredSilenceDuration = await getDurationOfOpusFile(silenceFilePath);
+                if (inferredSilenceDuration?.pcmBytes === silenceDuration * millisecondsToPcmBytes) {
+                    break;
+                }
+
+                console.error(`silence duration file for ${silenceDuration} mismatch, somehow.`);
             }
-        } else {
-            silenceDurations.add(silenceDuration);
-            silenceCommands.push(Bun.spawn([
+
+            await Bun.spawn([
                 'ffmpeg',
+                '-y',
                 '-f', 'lavfi',
                 '-i', `anullsrc=channel_layout=stereo:sample_rate=48000:duration=${(silenceDuration / 1000).toFixed(3)}`,
-                '-b', '6K',
-                silenceFilePath,
-            ], { stdio: ['ignore', 'ignore', 'ignore'] }).exited);
+                '-b:a', '6K',
+                silenceFilePathTmp,
+            ], { stdio: ['ignore', 'ignore', 'ignore'] }).exited;
+            await fsp.rename(silenceFilePathTmp, silenceFilePath);
+            silenceDurations.add(silenceDuration);
         }
 
         concatFile.write(`file '${silenceFilePath}'\nduration ${(silenceDuration / 1000).toFixed(3)}\nfile '${inputPath}'\nduration ${(inputDuration.milliseconds / 1000).toFixed(3)}\n`);
@@ -101,7 +111,7 @@ export const combineTracks = async (inputDirPath: string, username: string, outp
         ranges.set(startTimestamp, { precedingSilence: silenceDuration, inputDuration: inputDuration.milliseconds, endTimestamp: startTimestamp + inputDuration.milliseconds });
     }
 
-    await Promise.all([concatFile.end(), ...silenceCommands]);
+    await concatFile.end();
 
     await fsp.writeFile(path.join(outputDirPath, `${username}-segments.json`), JSON.stringify([...ranges.entries()].map(([k, v]) => ({ startTimestamp: k, ...v }))));
 
