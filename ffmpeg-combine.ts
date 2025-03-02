@@ -23,6 +23,7 @@ const getDurationOfOpusFile = async (inputPath: string) => {
 
 export const combineTracks = async (inputDirPath: string, username: string, outputDirPath: string) => {
     const inputDir = await fsp.opendir(inputDirPath);
+    await fsp.mkdir(outputDirPath, { recursive: true });
     const inputFiles = new Map<number, string>();
     const currentUserMatcher = new RegExp(`^${escapeStringRegexp(username)}\\.(?<startTimestamp>\\d+)\\.opus$`);
     for await (const inputFile of inputDir) {
@@ -54,6 +55,7 @@ export const combineTracks = async (inputDirPath: string, username: string, outp
         }
     }
 
+    let hasNegativeSilences = false;
     let prevTimestamp = Number(path.basename(inputDirPath));
     const ranges = new Map<number, Record<'precedingSilence'|'inputDuration'|'endTimestamp', number>>();
     for (const [startTimestamp, inputPath] of [...inputFiles.entries()].sort(([ts0, ], [ts1, ]) => ts0 - ts1)) {
@@ -78,8 +80,9 @@ export const combineTracks = async (inputDirPath: string, username: string, outp
         }
 
         const silenceDuration = startTimestamp - prevTimestamp;
-        if (silenceDuration < 0) {
-            console.error('MANUAL EFFORT NEEDED:', startTimestamp, username);
+        if (silenceDuration < 0 || (silenceDuration % 1) != 0) {
+            console.error('MANUAL EFFORT NEEDED. START:', startTimestamp, 'PREV:', prevTimestamp, username);
+            hasNegativeSilences = true;
         }
 
         const silenceFilePath = path.join(silenceDirPath, `silence.${silenceDuration}.opus`);
@@ -87,11 +90,19 @@ export const combineTracks = async (inputDirPath: string, username: string, outp
         while (true) {
             if (silenceDurations.has(silenceDuration)) {
                 const inferredSilenceDuration = await getDurationOfOpusFile(silenceFilePath);
-                if (inferredSilenceDuration?.pcmBytes === silenceDuration * millisecondsToPcmBytes) {
-                    break;
-                }
+                if (silenceDurations.has(silenceDuration)) {
+                    if (inferredSilenceDuration?.pcmBytes === silenceDuration * millisecondsToPcmBytes) {
+                        break;
+                    }
 
-                console.error(`silence duration file for ${silenceDuration} mismatch, somehow.`);
+                    console.error(`silence duration file for ${silenceDuration} mismatch, somehow.`);
+                    silenceDurations.delete(silenceDuration);
+                    await fsp.rm(silenceFilePath);
+                }
+            }
+
+            if (silenceDuration <= 0 || silenceDuration % 1 != 0) {
+                break;
             }
 
             await Bun.spawn([
@@ -102,12 +113,19 @@ export const combineTracks = async (inputDirPath: string, username: string, outp
                 '-b:a', '6K',
                 silenceFilePathTmp,
             ], { stdio: ['ignore', 'ignore', 'ignore'] }).exited;
-            await fsp.rename(silenceFilePathTmp, silenceFilePath);
-            silenceDurations.add(silenceDuration);
+            if (silenceDurations.has(silenceDuration)) {
+                await fsp.rm(silenceFilePathTmp);
+            } else {
+                silenceDurations.add(silenceDuration);
+                await fsp.rename(silenceFilePathTmp, silenceFilePath);
+            }
         }
 
-        concatFile.write(`file '${silenceFilePath}'\nduration ${(silenceDuration / 1000).toFixed(3)}\nfile '${inputPath}'\nduration ${(inputDuration.milliseconds / 1000).toFixed(3)}\n`);
-        prevTimestamp = startTimestamp + inputDuration.milliseconds;
+        if (silenceDuration != 0) {
+            concatFile.write(`file '${silenceFilePath}'\nduration ${(silenceDuration / 1000).toFixed(3)}\nfile '${inputPath}'\nduration ${(inputDuration.milliseconds / 1000).toFixed(3)}\n`);
+            prevTimestamp = startTimestamp + inputDuration.milliseconds;
+        }
+
         ranges.set(startTimestamp, { precedingSilence: silenceDuration, inputDuration: inputDuration.milliseconds, endTimestamp: startTimestamp + inputDuration.milliseconds });
     }
 
@@ -115,15 +133,89 @@ export const combineTracks = async (inputDirPath: string, username: string, outp
 
     await fsp.writeFile(path.join(outputDirPath, `${username}-segments.json`), JSON.stringify([...ranges.entries()].map(([k, v]) => ({ startTimestamp: k, ...v }))));
 
-    await Bun.spawn([
-        'ffmpeg',
-        '-y',
-        '-f', 'concat',
-        '-safe', '0',
-        '-segment_time_metadata', '1',
-        '-i', concatFilePath,
-        '-c', 'copy',
-        path.join(outputDirPath, `${username}.opus`),
-    ], { stdio: ['ignore', 'ignore', 'ignore'] }).exited;
-    await fsp.rm(concatFilePath);
+    if (!hasNegativeSilences) {
+        await Bun.spawn([
+            'ffmpeg',
+            '-y',
+            '-f', 'concat',
+            '-safe', '0',
+            '-segment_time_metadata', '1',
+            '-i', concatFilePath,
+            '-c', 'copy',
+            path.join(outputDirPath, `${username}.opus`),
+        ], { stdio: ['ignore', 'ignore', 'ignore'] }).exited;
+
+        await fsp.rm(concatFilePath);
+    }
+
+    return !hasNegativeSilences;
 };
+
+export const getMetadata = async (overallStartTimestamp: number, inputDirPath: string) => {
+    const inputDir = await fsp.opendir(inputDirPath);
+    const audioMatcher = new RegExp(`^audio\\.(?<startTimestamp>\\d+)\\.flac$`);
+    const screenMatcher = new RegExp(`^screen\\.(?<startTimestamp>\\d+)\\.mkv$`);
+    let audioTimestamp = null as number | null;
+    let screenTimestamp = null as number | null;
+    for await (const inputFile of inputDir) {
+        if (!inputFile.isFile()) {
+            continue;
+        }
+
+        const maybeAudioTimestamp = audioMatcher.exec(inputFile.name)?.groups?.['startTimestamp'];
+        const maybeScreenTimestamp = screenMatcher.exec(inputFile.name)?.groups?.['startTimestamp'];
+        if (typeof maybeAudioTimestamp === 'string') {
+            audioTimestamp = Number(maybeAudioTimestamp);
+        } else if (typeof maybeScreenTimestamp === 'string') {
+            screenTimestamp = Number(maybeScreenTimestamp);
+        } else {
+            continue;
+        }
+
+        if (audioTimestamp && screenTimestamp) {
+            return {
+                audioTimestamp,
+                screenTimestamp,
+                desktopAudioOffset: (screenTimestamp - audioTimestamp) / 1000,
+                discordAudioOffset: (screenTimestamp - overallStartTimestamp) / 1000,
+            }
+        }
+    }
+
+    return null;
+};
+
+export interface User {
+    username: string;
+    title: string;
+}
+export const fullProcess = async (inputDirPath: string, overallStartTimestamp: number, users: ReadonlyArray<User>, outputDirPath: string, ) => {
+    const combineResults = await Promise.all(users.map(({ username }) => combineTracks(inputDirPath, username, outputDirPath)));
+    if (combineResults.every(x => x)) {
+        const metadata = await getMetadata(overallStartTimestamp, inputDirPath);
+        if (metadata) {
+            const parts = [
+                'ffmpeg',
+                `-i ${path.join(inputDirPath, `screen.${metadata.screenTimestamp}.mkv`)}`,
+                `-ss ${metadata.desktopAudioOffset.toFixed(3)} -i ${path.join(inputDirPath, `audio.${metadata.audioTimestamp}.flac`)}`,
+                ...users.map(({ username }) =>
+                    `-ss ${metadata.discordAudioOffset.toFixed(3)} -i ${path.join(outputDirPath, `${username}.opus`)}`
+                ),
+                '-map 0 -c:v libsvtav1 -crf:v 26 -preset:v 6 -svtav1-params tune=3 -r 144 -video_track_timescale 144',
+                '-map 1 -c:a copy -metadata:s:a:0 title=Desktop',
+                ...users.map(({ title }, index) =>
+                    `-map ${index + 2} -metadata:s:a:${index + 1} title=${title}`
+                ),
+                path.join(outputDirPath, 'processed.mp4'),
+            ];
+            console.log(parts.join(' '));
+            if (metadata.desktopAudioOffset < 0) {
+                console.error('MANUAL EFFORT NEEDED. Desktop audio started before screen recording.')
+            }
+        } else {
+            console.log('Failed to find audio.*.flac and/or screen.*.mkv');
+        }
+    } else {
+        console.log('Not calculating offsets right now. Handle the reported manual interventions first.');
+    }
+}
