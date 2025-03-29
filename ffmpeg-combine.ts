@@ -43,6 +43,7 @@ export const combineTracks = async (inputDirPath: string, username: string, outp
     const silenceDurations = new Set<number>();
     const silenceDir = await fsp.opendir(silenceDirPath);
     const concatFilePath = path.join(outputDirPath, `concat-${username}.txt`);
+    await fsp.rm(concatFilePath, { force: true });
     const concatFile = Bun.file(concatFilePath).writer(); // don't bother with async, I can't figure it out quickly and it doesn't matter enough.
     for await (const outputFile of silenceDir) {
         if (!outputFile.isFile()) {
@@ -131,10 +132,11 @@ export const combineTracks = async (inputDirPath: string, username: string, outp
 
     await concatFile.end();
 
+    await fsp.rm(path.join(outputDirPath, `${username}-segments.json`), { force: true });
     await fsp.writeFile(path.join(outputDirPath, `${username}-segments.json`), JSON.stringify([...ranges.entries()].map(([k, v]) => ({ startTimestamp: k, ...v }))));
 
     if (!hasNegativeSilences) {
-        await Bun.spawn([
+        const res = await Bun.spawn([
             'ffmpeg',
             '-y',
             '-f', 'concat',
@@ -144,8 +146,11 @@ export const combineTracks = async (inputDirPath: string, username: string, outp
             '-c', 'copy',
             path.join(outputDirPath, `${username}.opus`),
         ], { stdio: ['ignore', 'ignore', 'ignore'] }).exited;
-
         await fsp.rm(concatFilePath);
+
+        if (res !== 0) {
+            throw new Error(`ffmpeg for ${username} exited with code ${res}`);
+        }
     }
 
     return !hasNegativeSilences;
